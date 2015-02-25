@@ -4,6 +4,7 @@ import sys
 import csv
 import datetime
 from numpy.random import normal
+from math import sqrt, ceil
 from random import randint
 from pprint import pprint
 
@@ -14,6 +15,58 @@ class genGaus:
     self.sigma = sigma
   def get(self):
     return normal(self.mu, self.sigma)
+
+# Class inspecting sensor status in given room
+# ['motion']['sensorID']['location' + 'status']
+# ['item'  ]['sensorID']['location' + 'status' + 'activity']
+class monitor:
+  def __init__(self, sensors):
+    self.truthTable           = {}
+    self.truthTable['motion'] = {}
+    self.truthTable['item']   = {}
+    for sensor in sensors:
+      if type(sensor[3]) == str:
+        self.truthTable['item'][sensor[0]] = {}
+        self.truthTable['item'][sensor[0]]['location'] = (sensor[1], sensor[2])
+        self.truthTable['item'][sensor[0]]['activity'] = sensor[3]
+        self.truthTable['item'][sensor[0]]['status']   = False
+      elif type(sensor[3]) == float:
+        self.truthTable['motion'][sensor[0]] = {}
+        self.truthTable['motion'][sensor[0]]['location'] = (sensor[1], sensor[2], sensor[3])
+        self.truthTable['motion'][sensor[0]]['status']   = False
+      else:
+        print "monitor class initialisation error: unknown sensor type!"
+        sys.exit(1)
+
+  def updateMotionSensor(self, currentPosition):
+    firedSensors = []
+    # find affected sensors
+    for sensor in self.truthTable['motion'].keys():
+      sensorLocation = self.truthTable['motion'][sensor]['location']
+      sensorStatus   = self.truthTable['motion'][sensor]['status']
+      # check if table-status agrees with current readings
+      if self.affected(sensorLocation, currentPosition) == sensorStatus: # status agrees
+        pass
+      else: # status does not agree
+        # change status in table
+        self.truthTable['motion'][sensor]['status'] = not(sensorStatus)
+        # record change
+        firedSensors.append( ( sensor, str(self.truthTable['motion'][sensor]['status']).lower()  ) )
+
+    # return list of sensor with changed state
+    return firedSensors
+
+  def affected(self, sensor, position):
+    d = sqrt( (position[0]-sensor[0])**2 + (position[1]-sensor[1])**2 )
+    # check proximity by inspecting position and radius
+    if d <= sensor[2]:
+      return True
+    else:
+      return False
+
+  def updateItemSensor(self, currentPosition):
+    pass
+    
 
 # Define predicate name for connected rooms - background knowledge
 connected = "connected"
@@ -272,7 +325,7 @@ if __name__ == '__main__':
       # get start of route
       if sequence.pop(0) != origin:
         print "Internal error: origin does not match!"
-        sys.exit(1)
+        # sys.exit(1)
       # get position in start room with cm accuracy
       ## get dimensions
       dims = sensors[origin]['dimension']
@@ -286,37 +339,62 @@ if __name__ == '__main__':
       current_position = origin_position
       # initialise time
       now = datetime.datetime.now()
-      # initialise steps number
-      steps = 0
       for room in sequence:
-        # # go from location in previous to door to *room*
-        # ## find location of door
-        # target_position = sensors[current]['door'][room]
-        # ## search the path
-        # ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
-        # ### find the length of path
-        # ### divide step-wise based on *stepSize*
-        # stepSize
-        # ### after each step check whether new sensor is activated
-        # generators['step']()
-        # ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " sensor ID " + " sensor state "
-        # # update time
-        # (now + datetime.timedelta(days, seconds, miliseconds))
-        # # append to outputData vector
-        # outputSensorData.append( "lol" )
+        # go from location in previous to door to *room*
+        ## find location of door
+        target_position = sensors[current]['door'][room]
+        ## search the path
+        xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
+        ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
+        slope       = (ya-yb) / (xa-xb)
+        intercept   = ya - slope * xa
+        ### find the length of path
+        distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
+        ### divide step-wise based on *stepSize*
+        neededSteps = int(ceil( distance / stepSize ))
 
-        # # memorise current location - use later to navigate to activity
-        # current          = room
-        # current_position = target_position
+        # initialise truth table for current tomorrow
+        tt = monitor(sensors[current]['sensor'])
+
+        ### do steps +1 for current position
+        for i in range(neededSteps+1):
+          
+          ### after each step check whether new sensor is activated
+          activated = tt.updateMotionSensor(current_position)
+
+          # find new position
+          ## increment step along distance
+          # current_position = 
+        
+          for unit in activated:
+            # compose entry
+            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+            # append to outputData vector
+            outputSensorData.append( ppp )
+
+          # update time
+          stepTime = generators['step']()
+          days, seconds, miliseconds = 0, stepTime, 0
+          now += datetime.timedelta(days, seconds, miliseconds)
+
+        # memorise current location - use later to navigate to activity
+        current          = room
+        current_position = target_position
 
 
       # check for reaching the target
-      if currnet != goal:
+      if current != goal:
         print "Path did not converge!"
         sys.exit(1)
     elif move[0] == 'do': # action
       # find position of sensor in current room
+      for i in sensors[current]['sensor']:
+        if move[1] == i[3]:
+          target          = current
+          target_position = (i[1], i[2])
+          break
       # go to this position 
+      # go()
       # do the activity: emulate sensors
       pass
     else:
