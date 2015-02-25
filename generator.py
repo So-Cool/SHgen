@@ -4,6 +4,7 @@ import sys
 import csv
 import datetime
 from numpy.random import normal
+from random import randint
 from pprint import pprint
 
 # Gaussian generator class
@@ -34,8 +35,11 @@ sensorLocation = "sensorIn"
 # activity fixed to sensor keyword for Prolog bg
 sensorActivity = "sensorActivity"
 
-# Background knowledge file name
+# Background knowledge file-name
 bgFilename = "bg.pl"
+
+# generated data file-name
+dataFilename = "data.txt"
 
 # step size in meters
 stepSize = .5
@@ -166,10 +170,10 @@ def layout( Flay, keys ):
 
         sensors[roomID]['dimension'] = ( float(line[1]), float(line[2][:-1]) )
         sensors[roomID]['sensor']   = []
-        sensors[roomID]['door']   = []
+        sensors[roomID]['door']   = {}
       elif 'door' in line[0]: # add door information
         try:
-          sensors[roomID]['door'].append( (line[3], float(line[1]), float(line[2])) )
+          sensors[roomID]['door'][line[3]] = (float(line[1]), float(line[2]))
         except:
           print "'door' format error"
           print line
@@ -229,12 +233,9 @@ if __name__ == '__main__':
   ## initialise location variables
   origin  = None
   current = None
-  ## initialise time
-  now = datetime.datetime.now()
   ## get output data stream
   outputSensorData = []
   # TODO: activity what is going on in Prolog as ground truth
-  #
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if move[0] == 'start': # location
@@ -267,35 +268,62 @@ if __name__ == '__main__':
       # TODO: if no cycles only one solution should be returned
       # TODO: it doesn't matter - the shortest is chosen
       sequence = solutions[0]
+
+      # get start of route
+      if sequence.pop(0) != origin:
+        print "Internal error: origin does not match!"
+        sys.exit(1)
+      # get position in start room with cm accuracy
+      ## get dimensions
+      dims = sensors[origin]['dimension']
+      ## change from meters to cent-meters
+      dims = tuple( [100*x for x in dims] )
+      ## get random position
+      origin_position = ( float(randint(0, dims[0])), float(randint(0, dims[1])) )
+
+      # remember current room
+      current          = origin
+      current_position = origin_position
+      # initialise time
+      now = datetime.datetime.now()
+      # initialise steps number
+      steps = 0
       for room in sequence:
-        generators['step']()
-        ## Check for sensors activation and record to file
-        p1 = now.strftime( "%Y-%m-%d %H:%M:%S.%f" )
-        p2 = "sensor ID"
-        p3 = "sensor state"
-        # update time
-        (now + datetime.timedelta(days, seconds, miliseconds))
-        # append to outputData vector
-        outputSensorData.append( "lol" )
-        # get location memory
-      currnet = goal
+        # # go from location in previous to door to *room*
+        # ## find location of door
+        # target_position = sensors[current]['door'][room]
+        # ## search the path
+        # ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
+        # ### find the length of path
+        # ### divide step-wise based on *stepSize*
+        # stepSize
+        # ### after each step check whether new sensor is activated
+        # generators['step']()
+        # ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " sensor ID " + " sensor state "
+        # # update time
+        # (now + datetime.timedelta(days, seconds, miliseconds))
+        # # append to outputData vector
+        # outputSensorData.append( "lol" )
+
+        # # memorise current location - use later to navigate to activity
+        # current          = room
+        # current_position = target_position
+
+
+      # check for reaching the target
+      if currnet != goal:
+        print "Path did not converge!"
+        sys.exit(1)
     elif move[0] == 'do': # action
       # find position of sensor in current room
       # go to this position 
-      # do the ativity: emulate snesors
+      # do the activity: emulate sensors
       pass
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
       sys.exit(1)
-  
-  pprint( sensors)
-  sys.exit(0)
 
-  # TODO: give some reasonable file-name
-  with open("data.txt", 'wb') as datafile:
-    datafile.write('\n'.join(data))
-
-  # TODO: noise parameter
-  # TODO: data incompleteness parameter
-  # TODO: multiple occupiers
+  # write generated data to file
+  with open(dataFilename, 'wb') as datafile:
+    datafile.write('\n'.join(outputSensorData))
