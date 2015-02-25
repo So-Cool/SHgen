@@ -18,8 +18,27 @@ class genGaus:
 connected = "connected"
 # Constants
 nl = '\n'
-fact = 'F'
-interchangable = connected + "(A, B) :- " + connected + fact + "(A, B); " + connected + fact + "(B, A)." + nl
+fact = '__'
+rev  = '_'
+
+interconnected = connected + "(A, B) :-" + nl + "  " + connected + "(A, B, [])."
+interconnected += nl + connected + "(A, B, V) :-" + nl
+interconnected += "  " + connected + rev + "(A, X), not( member(X, V) )," + nl
+interconnected += "  (" + nl + "    " + "B = X" + nl + "  " + "; " + connected
+interconnected += "(X, B, [A|V])" + nl + "  " + "), !." + nl + nl
+
+interchangable = connected + rev + "(A, B) :-" + nl + "  " + connected + fact + "(A, B); " + connected + fact + "(B, A)." + nl + nl
+
+# sensor location keyword for Prolog facts
+sensorLocation = "sensorIn"
+# activity fixed to sensor keyword for Prolog bg
+sensorActivity = "sensorActivity"
+
+# Background knowledge file name
+bgFilename = "bg.pl"
+
+# step size in meters
+stepSize = .5
 
 # Define functions
 ## Read in adjacency matrix
@@ -48,12 +67,7 @@ def rooms( Fadj ):
     vals.append( dict(zip(keys, i)) )
   layout = dict(zip(keys, vals))
 
-  return layout
-
-
-# Convert house layout to Prolog
-def activities( Fact, layout ):
-  facts = [interchangable]
+  facts = [interconnected, interchangable]
   keys1 = layout.keys()
   keys2 = layout.keys()
   for key1 in keys1:
@@ -63,10 +77,14 @@ def activities( Fact, layout ):
     # adjacency matrix is symmetric
     keys2.remove(key1)
   # write to file
-  # TODO: give some reasonable filename
-  with open("bg.pl", 'wb') as bgfile:
+  with open(bgFilename, 'wb') as bgfile:
     bgfile.write(''.join(facts))
 
+  return layout
+
+
+# get time generators for activities
+def activities( Fact ):
   # load model parameters: assume structure [name mu sigma]
   model = []
   with open(Fact, 'rb') as bgfile:
@@ -74,6 +92,13 @@ def activities( Fact, layout ):
     for row in parameters:
       # clean all empty strings
       cleanRow = filter(lambda a: a != '', row)
+
+      # check for comment or empty line
+      if cleanRow == []:
+        continue
+      if cleanRow[0][0] == ';':
+        continue
+
       try:
         tup = ( cleanRow[0], float(cleanRow[1]), float(cleanRow[2]) )
       except:
@@ -113,7 +138,6 @@ def path( Fpath ):
 # read in rooms layout into sensors dictionary
 def layout( Flay, keys ):
   sensors = {}
-  # TODO: Prolog where what sensor is located: location(m01, living_room)
   with open(Flay, 'rb') as layfile:
     # split into rooms: dictionary { rooms: { sensors:[], doors:[] } }
     ## do each activity per room
@@ -162,6 +186,20 @@ def layout( Flay, keys ):
           print line
           sys.exit(1)
 
+  facts = []
+  for k in sensors.keys():
+    for r in sensors[k]['sensor']:
+      # save sensor location - for motion sensors
+      facts.append( sensorLocation + "(" + r[0] + ", " + k + ")." )
+      # if this is item or activity sensor - remember additional activity fixed to sensor
+      if type(r[3]) == str:
+        facts.append( sensorActivity + "(" + r[0] + ", " + r[3] + ")." )
+
+  with open(bgFilename, 'ab') as bgfile:
+      bgfile.write('\n')
+      bgfile.write('\n'.join(facts))
+      bgfile.write('\n')
+
   return sensors
 
 
@@ -179,7 +217,7 @@ if __name__ == '__main__':
 
   # read in house specification
   roomLayout = rooms( Fadj )
-  generators = activities( Fact, roomLayout )
+  generators = activities( Fact )
   path = path( Fpath )
   sensors = layout( Flay, roomLayout.keys() )
 
@@ -190,34 +228,61 @@ if __name__ == '__main__':
     sys.exit(1)
   ## initialise location variables
   origin  = None
-  last    = None
   current = None
   ## initialise time
   now = datetime.datetime.now()
   ## get output data stream
-  outputData = []
+  outputSensorData = []
   # TODO: activity what is going on in Prolog as ground truth
-  # TODO: append sensors and devices(i.e. device sensors) to room layout
+  #
+  # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if move[0] == 'start': # location
       origin = current = move[1]
     elif move[0] == 'go': # location
       # move from current to new_location
-      ## Find path in adjacency matrix
+      ## Find path in adjacency matrix -- BFS
+      goal  = move[1]
+      # queue contains tuples indicating paths
+      queue = [ [current] ]
+      # get paths through adjacency matrix
+      solutions = []
+      while len(queue) != 0:
+        # get first element
+        q  = queue.pop(-1)
+        qL = q[-1]
+        # find connected rooms and no backsies
+        newLevel = [room for room in roomLayout[qL].keys() if roomLayout[qL][room] and room not in q ]
+        # check if any of this is a solution
+        if goal in newLevel:
+          # solution is found
+          solutions.append( q + [goal] )
+          # TODO if there are no cycles goal can be removed form *newLevel*
+        # append  newbies
+        partialPaths = [q+[r] for r in newLevel]
+        # in this order to preserve BFS
+        queue = partialPaths + queue
+
       ## Go through all needed rooms in given order: aim at door - Cartesian
-      generators['step']()
-      ## Check for sensors activation and record to file
-      p1 = now.strftime( "%Y-%m-%d %H:%M:%S.%f" )
-      p2 = "sensor ID"
-      p3 = "sensor state"
-      # update time
-      (now + datetime.timedelta(days, seconds, miliseconds))
-      # append to outputData vector
-      outputData.append( "lol" )
-      # get location memory
-      last = current
-      currnet = move[1]
+      # TODO: if no cycles only one solution should be returned
+      # TODO: it doesn't matter - the shortest is chosen
+      sequence = solutions[0]
+      for room in sequence:
+        generators['step']()
+        ## Check for sensors activation and record to file
+        p1 = now.strftime( "%Y-%m-%d %H:%M:%S.%f" )
+        p2 = "sensor ID"
+        p3 = "sensor state"
+        # update time
+        (now + datetime.timedelta(days, seconds, miliseconds))
+        # append to outputData vector
+        outputSensorData.append( "lol" )
+        # get location memory
+      currnet = goal
     elif move[0] == 'do': # action
+      # find position of sensor in current room
+      # go to this position 
+      # do the ativity: emulate snesors
       pass
     else:
       print "Action is not 'start', 'go', 'do'!"
