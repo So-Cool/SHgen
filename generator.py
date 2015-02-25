@@ -284,7 +284,6 @@ if __name__ == '__main__':
     print "First action is not 'start'!"
     sys.exit(1)
   ## initialise location variables
-  origin  = None
   current = None
   ## get output data stream
   outputSensorData = []
@@ -292,7 +291,7 @@ if __name__ == '__main__':
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if move[0] == 'start': # location
-      origin = current = move[1]
+      current = move[1]
     elif move[0] == 'go': # location
       # move from current to new_location
       ## Find path in adjacency matrix -- BFS
@@ -323,20 +322,19 @@ if __name__ == '__main__':
       sequence = solutions[0]
 
       # get start of route
-      if sequence.pop(0) != origin:
+      if sequence.pop(0) != current:
         print "Internal error: origin does not match!"
-        # sys.exit(1)
+        sys.exit(1)
       # get position in start room with cm accuracy
       ## get dimensions
-      dims = sensors[origin]['dimension']
+      dims = sensors[current]['dimension']
       ## change from meters to cent-meters
       dims = tuple( [100*x for x in dims] )
       ## get random position
-      origin_position = ( float(randint(0, dims[0])), float(randint(0, dims[1])) )
+      current_position = ( float(randint(0, dims[0])), float(randint(0, dims[1])) )
+      # remember
+      current = current
 
-      # remember current room
-      current          = origin
-      current_position = origin_position
       # initialise time
       now = datetime.datetime.now()
       for room in sequence:
@@ -345,9 +343,11 @@ if __name__ == '__main__':
         target_position = sensors[current]['door'][room]
         ## search the path
         xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
+        ## get momentum
+        momentumX, momentumY = xb-xa, yb-ya
         ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
         slope       = (ya-yb) / (xa-xb)
-        intercept   = ya - slope * xa
+        # intercept   = ya - slope * xa
         ### find the length of path
         distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
         ### divide step-wise based on *stepSize*
@@ -363,8 +363,11 @@ if __name__ == '__main__':
           activated = tt.updateMotionSensor(current_position)
 
           # find new position
-          ## increment step along distance
+          x1 = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
+          x2 = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
+          ## increment step along distance form *current* towards *target*
           # current_position = 
+          # Trim new position to room size
         
           for unit in activated:
             # compose entry
@@ -405,3 +408,4 @@ if __name__ == '__main__':
   # write generated data to file
   with open(dataFilename, 'wb') as datafile:
     datafile.write('\n'.join(outputSensorData))
+    datafile.write('\n')
