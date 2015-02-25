@@ -21,22 +21,9 @@ nl = '\n'
 fact = 'F'
 interchangable = connected + "(A, B) :- " + connected + fact + "(A, B); " + connected + fact + "(B, A)." + nl
 
-
-if __name__ == '__main__':
-  # Check whether file is given as argument
-  args = sys.argv
-  if len(args) != 5:
-    # Fail
-    print "No files specified."
-    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
-    sys.exit(1)
-
-  Fadj  = args[1]
-  Fact  = args[2]
-  Fpath = args[3]
-  Flay  = args[4]
-
-  # Read in adjacency matrix
+# Define functions
+## Read in adjacency matrix
+def rooms( Fadj ):
   rooms = []
   with open(Fadj, 'rb') as csvfile:
     matrix = csv.reader(csvfile, delimiter=' ', skipinitialspace=True)
@@ -61,7 +48,11 @@ if __name__ == '__main__':
     vals.append( dict(zip(keys, i)) )
   layout = dict(zip(keys, vals))
 
-  # Convert house layout to Prolog
+  return layout
+
+
+# Convert house layout to Prolog
+def activities( Fact, layout ):
   facts = [interchangable]
   keys1 = layout.keys()
   keys2 = layout.keys()
@@ -97,7 +88,11 @@ if __name__ == '__main__':
   for gen in model:
     generators[gen[0]] = genGaus(gen[1], gen[2]).get
 
-  # read in path
+  return generators
+
+
+# read in path
+def path( Fpath ):
   path = []
   with open(Fpath, 'rb') as pathfile:
     for line in pathfile:
@@ -112,13 +107,16 @@ if __name__ == '__main__':
       # append tuple to path
       path.append( (command, argument) )
 
-  # read in rooms layout into sensors dictionary
+  return path
+
+
+# read in rooms layout into sensors dictionary
+def layout( Flay, keys ):
   sensors = {}
   # TODO: Prolog where what sensor is located: location(m01, living_room)
   with open(Flay, 'rb') as layfile:
     # split into rooms: dictionary { rooms: { sensors:[], doors:[] } }
     ## do each activity per room
-    keys = layout.keys()
     for line in layfile:
       line = line.strip('\n')
       # split on *spaces*
@@ -153,40 +151,86 @@ if __name__ == '__main__':
           print line
           sys.exit(1)
       else: # append sensors
-        # try:
+        try:
           try:
             r = float(line[3])
           except:
             r = line[3]
           sensors[roomID]['sensor'].append( (line[0], float(line[1]), float(line[2]), r ) )
-        # except:
-        #   print "'sensor' format error:"
-        #   print line
-        #   sys.exit(1)
+        except:
+          print "'sensor' format error:"
+          print line
+          sys.exit(1)
 
-  ##############################################################################
-  pprint( sensors)
-  sys.exit(0)
-  ##### layout, generators, path, sensors
+  return sensors
+
+
+if __name__ == '__main__':
+  # Check whether file is given as argument
+  args = sys.argv
+  if len(args) != 5:
+    # Fail
+    print "No files specified."
+    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
+    sys.exit(1)
+
+  # load files
+  Fadj, Fact, Fpath, Flay = args[1], args[2], args[3], args[4]
+
+  # read in house specification
+  roomLayout = rooms( Fadj )
+  generators = activities( Fact, roomLayout )
+  path = path( Fpath )
+  sensors = layout( Flay, roomLayout.keys() )
+
   # generate random paths with timestamps
   ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
-  ## get now
+  if path[0][0] != 'start':
+    print "First action is not 'start'!"
+    sys.exit(1)
+  ## initialise location variables
+  origin  = None
+  last    = None
+  current = None
+  ## initialise time
   now = datetime.datetime.now()
-  data = []
-  # TODO: acitvity what is going on in prolog as ground truth
+  ## get output data stream
+  outputData = []
+  # TODO: activity what is going on in Prolog as ground truth
+  # TODO: append sensors and devices(i.e. device sensors) to room layout
+  for move in path:
+    if move[0] == 'start': # location
+      origin = current = move[1]
+    elif move[0] == 'go': # location
+      # move from current to new_location
+      ## Find path in adjacency matrix
+      ## Go through all needed rooms in given order: aim at door - Cartesian
+      generators['step']()
+      ## Check for sensors activation and record to file
+      p1 = now.strftime( "%Y-%m-%d %H:%M:%S.%f" )
+      p2 = "sensor ID"
+      p3 = "sensor state"
+      # update time
+      (now + datetime.timedelta(days, seconds, miliseconds))
+      # append to outputData vector
+      outputData.append( "lol" )
+      # get location memory
+      last = current
+      currnet = move[1]
+    elif move[0] == 'do': # action
+      pass
+    else:
+      print "Action is not 'start', 'go', 'do'!"
+      print "> ", move, " <"
+      sys.exit(1)
+  
+  pprint( sensors)
+  sys.exit(0)
 
-  # find path in graph: go() + start() commands: current + target
-  # find path in corresponding Cartesians
-  generators['step']()
-  now.strftime( "%Y-%m-%d %H:%M:%S.%f" )
-  (now + datetime.timedelta(days, seconds, miliseconds))
-  # append sensors and devices(i.e. device sensors) to room layout
-
-
-  # noise parameter
-  # data incompleteness parameter
-  # multiple occupiers
-
-  # TODO: give some reasonable filename
+  # TODO: give some reasonable file-name
   with open("data.txt", 'wb') as datafile:
-    datafile.write(''.join(data))
+    datafile.write('\n'.join(data))
+
+  # TODO: noise parameter
+  # TODO: data incompleteness parameter
+  # TODO: multiple occupiers
