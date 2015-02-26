@@ -85,8 +85,26 @@ class monitor:
   def display(self):
     return self.truthTable
 
-  def updateItemSensor(self, currentPosition):
-    pass
+  def getItemDetails(self, activity):
+    for sensorID in self.truthTable['item'].keys():
+      if self.truthTable['item'][sensorID]['activity'] == activity:
+        return (sensorID, i['location'])
+
+  def activateItem(self, sensorID):
+    if self.truthTable['item'][sensorID]['status'] != False:
+      print "Item sensor state error A: ", sensorID
+      sys.exit(1)
+    self.truthTable['item'][sensorID]['status'] = True
+    sensorState = 'true'
+    return [(sensorID, sensorState)]
+
+  def deactivateItem(self, sensorID):
+    if self.truthTable['item'][sensorID]['status'] != True:
+      print "Item sensor state error D-A: ", sensorID
+      sys.exit(1)
+    self.truthTable['item'][sensorID]['status'] = False
+    sensorState = 'false'
+    return [(sensorID, sensorState)]
     
 
 # Define predicate name for connected rooms - background knowledge
@@ -288,6 +306,15 @@ def layout( Flay, keys ):
 
   return sensors
 
+# generate entries to update sensor readings
+def updateOutput(activated, now):
+  readings = []
+  for unit in activated:
+    # compose entry
+    ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+    # append to outputData vector
+    readings.append( ppp )
+  return readings
 
 if __name__ == '__main__':
   # Check whether file is given as argument
@@ -322,7 +349,6 @@ if __name__ == '__main__':
   now = datetime.datetime.now()
   ## get output data stream
   outputSensorData = []
-  # TODO: activity what is going on in Prolog as ground truth
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if move[0] == 'start': # location
@@ -379,11 +405,8 @@ if __name__ == '__main__':
             # clean old room
             # on room exit switch off sensors which havent switched off & are within you range
             activated = tt.motionSensorsOn(previous_position)
-            for unit in activated:
-              # compose entry
-              ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
-              # append to outputData vector
-              outputSensorData.append( ppp )
+            # append new activities
+            outputSensorData += updateOutput(activated, now)
             # initialise new room
             tt = monitor(current, sensors[current]['sensor'])
         else:
@@ -393,15 +416,15 @@ if __name__ == '__main__':
         ## find location of door
         target_position = sensors[current]['door'][room]
 
+
+        ########################################################################
+        ###  tt, current_position, target position, now, generators, sensors - return outputSensor, now, current_position
         # Check if you're already there
         if current_position == target_position:
           neededSteps = -1
           activated = tt.motionSensorsOn(current_position)
-          for unit in activated:
-            # compose entry
-            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
-            # append to outputData vector
-            outputSensorData.append( ppp )
+          # append new activities
+          outputSensorData += updateOutput(activated, now)
         else:
           ## search the path
           xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
@@ -425,12 +448,8 @@ if __name__ == '__main__':
           
           ### after each step check whether new sensor is activated
           activated = tt.updateMotionSensor(current_position)
-
-          for unit in activated:
-            # compose entry
-            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
-            # append to outputData vector
-            outputSensorData.append( ppp )
+          # append new activities
+          outputSensorData += updateOutput(activated, now)
 
           # find new position
           if momentumX > 0:
@@ -472,6 +491,8 @@ if __name__ == '__main__':
           days, seconds, miliseconds = 0, stepTime, 0
           now += datetime.timedelta(days, seconds, miliseconds)
 
+        ########################################################################
+
         # memorise last position in previous room
         previous_position = current_position
         ## remember to position at door when going to next room
@@ -482,11 +503,8 @@ if __name__ == '__main__':
       # Now you are in new room but haven't moved yet: check sensors
       tt = monitor(current, sensors[current]['sensor'])
       activated = tt.updateMotionSensor(current_position)
-      for unit in activated:
-        # compose entry
-        ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
-        # append to outputData vector
-        outputSensorData.append( ppp )
+      # append new activities
+      outputSensorData += updateOutput(activated, now)
 
       # check for reaching the target
       if current != goal:
@@ -494,18 +512,24 @@ if __name__ == '__main__':
         sys.exit(1)
     elif move[0] == 'do': # action: item & activity sensors
       # find position of sensor in current room
-      for i in sensors[current]['sensor']:
-        if move[1] == i[3]:
-          target          = current
-          target_position = (i[1], i[2])
-          break
-      # go to this position 
+      (sensorID, target_position) = tt.getItemDetails(move[1])
+
+      # go to this position: remember to update current_position & previous_position
       # go()
+
       # do the activity: emulate sensors
       ## activate sensor
-
+      activated = tt.activateItem(sensorID)
+      ### append new activities
+      outputSensorData += updateOutput(activated, now)
       ## emulate activity time
+      stepTime = generators[move[1]]()
+      days, seconds, miliseconds = 0, stepTime, 0
+      now += datetime.timedelta(days, seconds, miliseconds)
       ## turn of activity sensor
+      activated = tt.deactivateItem(sensorID)
+      ### append new activities
+      outputSensorData += updateOutput(activated, now)
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
@@ -516,5 +540,4 @@ if __name__ == '__main__':
     datafile.write('\n'.join(outputSensorData))
     datafile.write('\n')
 
-# generate prolog ground truth of loctions
-# Prolog rule: activity-a in sensor field m01
+# generate Prolog ground truth of locations & activity as a in sensor field m01
