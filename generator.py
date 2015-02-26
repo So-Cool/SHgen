@@ -88,7 +88,9 @@ class monitor:
   def getItemDetails(self, activity):
     for sensorID in self.truthTable['item'].keys():
       if self.truthTable['item'][sensorID]['activity'] == activity:
-        return (sensorID, i['location'])
+        return (sensorID, self.truthTable['item'][sensorID]['location'])
+    print "Activity *", activity, "* not defined in room ", self.location
+    sys.exit(1)
 
   def activateItem(self, sensorID):
     if self.truthTable['item'][sensorID]['status'] != False:
@@ -316,6 +318,85 @@ def updateOutput(activated, now):
     readings.append( ppp )
   return readings
 
+# move within one room
+def moveWithinRoom(tt, current_position, target_position, now, generators, sensors):
+  # sensors readings
+  readings = []
+  # Check if you're already there
+  if current_position == target_position:
+    neededSteps = -1
+    activated = tt.motionSensorsOn(current_position)
+    # append new activities
+    readings += updateOutput(activated, now)
+  else:
+    ## search the path
+    xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
+    ## get momentum
+    momentumX, momentumY = xb-xa, yb-ya
+
+    # what if you move VERTICALLY: temporary workaround -- rotate 90o
+    if momentumX == 0:
+      xa, xb, ya, yb = ya, yb, xa, xb
+
+    ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
+    slope       = (ya-yb) / (xa-xb)
+    intercept   = ya - slope * xa
+    ### find the length of path
+    distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
+    ### divide step-wise based on *stepSize*
+    neededSteps = int(ceil( distance / stepSize ))
+
+  ### do steps
+  for i in range(neededSteps):
+    
+    ### after each step check whether new sensor is activated
+    activated = tt.updateMotionSensor(current_position)
+    # append new activities
+    readings += updateOutput(activated, now)
+
+    # find new position
+    ## increment step along distance form *current* towards *target*
+    if momentumX > 0:
+      x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
+      y = slope * x + intercept
+    elif momentumX < 0:
+      x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
+      y = slope * x + intercept
+    elif momentumX == 0: # what if you move VERTICALLY
+      if momentumY > 0:
+        y = current_position[1] + sqrt( stepSize**2 / (slope**2 +1) )
+        x = slope * y + intercept
+      elif momentumY < 0:
+        y = current_position[1] - sqrt( stepSize**2 / (slope**2 +1) )
+        x = slope * y + intercept
+      else:
+        print "Internal error: panic attack!"
+        sys.exit(1)
+    else:
+      print "Internal error: panic attack!"
+      sys.exit(1)
+    
+    
+    
+    # Trim new position to room size
+    if x > sensors[current]['dimension'][0]:
+      x = sensors[current]['dimension'][0]
+    elif x < 0:
+      x = 0
+    if y > sensors[current]['dimension'][1]:
+      y = sensors[current]['dimension'][1]
+    elif y < 0:
+      y  = 0
+    # save position
+    current_position = (x, y)
+
+    # update time
+    stepTime = generators['step']()
+    days, seconds, miliseconds = 0, stepTime, 0
+    now += datetime.timedelta(days, seconds, miliseconds)
+
+  return (readings, current_position, now)
+
 if __name__ == '__main__':
   # Check whether file is given as argument
   args = sys.argv
@@ -400,7 +481,8 @@ if __name__ == '__main__':
         if tt != None:
           # check if it is already the room you are in
           if current == tt.getLocation(): # it is already initialised to the location you are in
-            pass # do not change it
+            pass # you're already there do not change *monitor*: tt=tt
+            # remember to clean the room on exit
           else: # initialise new as room does not match
             # clean old room
             # on room exit switch off sensors which havent switched off & are within you range
@@ -416,82 +498,9 @@ if __name__ == '__main__':
         ## find location of door
         target_position = sensors[current]['door'][room]
 
-
-        ########################################################################
-        ###  tt, current_position, target position, now, generators, sensors - return outputSensor, now, current_position
-        # Check if you're already there
-        if current_position == target_position:
-          neededSteps = -1
-          activated = tt.motionSensorsOn(current_position)
-          # append new activities
-          outputSensorData += updateOutput(activated, now)
-        else:
-          ## search the path
-          xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
-          ## get momentum
-          momentumX, momentumY = xb-xa, yb-ya
-
-          # what if you move VERTICALLY: temporary workaround -- rotate 90o
-          if momentumX == 0:
-            xa, xb, ya, yb = ya, yb, xa, xb
-
-          ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
-          slope       = (ya-yb) / (xa-xb)
-          intercept   = ya - slope * xa
-          ### find the length of path
-          distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
-          ### divide step-wise based on *stepSize*
-          neededSteps = int(ceil( distance / stepSize ))
-
-        ### do steps +1 for current position
-        for i in range(neededSteps+1):
-          
-          ### after each step check whether new sensor is activated
-          activated = tt.updateMotionSensor(current_position)
-          # append new activities
-          outputSensorData += updateOutput(activated, now)
-
-          # find new position
-          if momentumX > 0:
-            x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
-            y = slope * x + intercept
-          elif momentumX < 0:
-            x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
-            y = slope * x + intercept
-          elif momentumX == 0: # what if you move VERTICALLY
-            if momentumY > 0:
-              y = current_position[1] + sqrt( stepSize**2 / (slope**2 +1) )
-              x = slope * y + intercept
-            elif momentumY < 0:
-              y = current_position[1] - sqrt( stepSize**2 / (slope**2 +1) )
-              x = slope * y + intercept
-            else:
-              print "Internal error: panic attack!"
-              sys.exit(1)
-          else:
-            print "Internal error: panic attack!"
-            sys.exit(1)
-          
-          ## increment step along distance form *current* towards *target*
-          
-          # Trim new position to room size
-          if x > sensors[current]['dimension'][0]:
-            x = sensors[current]['dimension'][0]
-          elif x < 0:
-            x = 0
-          if y > sensors[current]['dimension'][1]:
-            y = sensors[current]['dimension'][1]
-          elif y < 0:
-            y  = 0
-          # save position
-          current_position = (x, y)
-
-          # update time
-          stepTime = generators['step']()
-          days, seconds, miliseconds = 0, stepTime, 0
-          now += datetime.timedelta(days, seconds, miliseconds)
-
-        ########################################################################
+        # move within a room
+        (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+        outputSensorData += readings
 
         # memorise last position in previous room
         previous_position = current_position
@@ -499,6 +508,14 @@ if __name__ == '__main__':
         current_position = sensors[room]['door'][current] #target_position
         # memorise current location - use later to navigate to activity
         current          = room
+
+      # Check whether old room has been cleaned
+      print "Gerronimo, ", previous_position
+      pprint(tt.display())
+      activated = tt.motionSensorsOn(previous_position)
+      pprint(tt.display())
+      # append new activities
+      outputSensorData += updateOutput(activated, now)
 
       # Now you are in new room but haven't moved yet: check sensors
       tt = monitor(current, sensors[current]['sensor'])
@@ -515,7 +532,10 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # go to this position: remember to update current_position & previous_position
-      # go()
+      # move within a room
+      print move[1]
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      outputSensorData += readings
 
       # do the activity: emulate sensors
       ## activate sensor
