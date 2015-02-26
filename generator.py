@@ -20,7 +20,8 @@ class genGaus:
 # ['motion']['sensorID']['location' + 'status']
 # ['item'  ]['sensorID']['location' + 'status' + 'activity']
 class monitor:
-  def __init__(self, sensors):
+  def __init__(self, location, sensors):
+    self.location = location
     self.truthTable           = {}
     self.truthTable['motion'] = {}
     self.truthTable['item']   = {}
@@ -37,6 +38,9 @@ class monitor:
       else:
         print "monitor class initialisation error: unknown sensor type!"
         sys.exit(1)
+
+  def getLocation(self):
+    return self.location
 
   def updateMotionSensor(self, currentPosition):
     firedSensors = []
@@ -56,13 +60,14 @@ class monitor:
     # return list of sensor with changed state
     return firedSensors
 
-  def motionSensorsOn(self):
+  def motionSensorsOn(self, currentPosition):
     firedSensors = []
     # find affected sensors
     for sensor in self.truthTable['motion'].keys():
       sensorStatus   = self.truthTable['motion'][sensor]['status']
+      sensorLocation = self.truthTable['motion'][sensor]['location']
       # check if table-status agrees with current readings
-      if sensorStatus: # id ON
+      if sensorStatus and self.affected(sensorLocation, currentPosition): # id ON & is within your range
         self.truthTable['motion'][sensor]['status'] = not(sensorStatus)
         firedSensors.append( ( sensor, str(self.truthTable['motion'][sensor]['status']).lower()  ) )        
 
@@ -76,6 +81,9 @@ class monitor:
       return True
     else:
       return False
+
+  def display(self):
+    return self.truthTable
 
   def updateItemSensor(self, currentPosition):
     pass
@@ -193,6 +201,13 @@ def path( Fpath ):
   with open(Fpath, 'rb') as pathfile:
     for line in pathfile:
       line = line.strip('\n')
+
+      # check for comment or empty line
+      if line == []:
+        continue
+      if line[0][0] == ';':
+        continue
+
       f1 = line.find('(')
       f2 = line.find(')')
       if f1 == -1 or f2 == -1:
@@ -299,6 +314,10 @@ if __name__ == '__main__':
     sys.exit(1)
   ## initialise location variables
   current = None
+  ## initialise sensor watchdog
+  tt = None
+  ## remember previous position
+  previous_position = None
   # initialise time
   now = datetime.datetime.now()
   ## get output data stream
@@ -350,19 +369,34 @@ if __name__ == '__main__':
         sys.exit(1)
 
       for room in sequence:
-        print "current", current
-        print "room", room
-        # initialise truth table for current tomorrow
-        tt = monitor(sensors[current]['sensor'])
+        # initialise truth table for current location
+        ## check if already initialised
+        if tt != None:
+          # check if it is already the room you are in
+          if current == tt.getLocation(): # it is already initialised to the location you are in
+            pass # do not change it
+          else: # initialise new as room does not match
+            # clean old room
+            # on room exit switch off sensors which havent switched off & are within you range
+            activated = tt.motionSensorsOn(previous_position)
+            for unit in activated:
+              # compose entry
+              ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+              # append to outputData vector
+              outputSensorData.append( ppp )
+            # initialise new room
+            tt = monitor(current, sensors[current]['sensor'])
+        else:
+          tt = monitor(current, sensors[current]['sensor'])
 
         # go from location in previous to door to *room*
         ## find location of door
         target_position = sensors[current]['door'][room]
 
-        # Check if you're already there
+        # Check if you're already there!!!!!!!!!!!!!
         if current_position == target_position:
           neededSteps = -1
-          activated = tt.updateMotionSensor(current_position)
+          activated = tt.motionSensorsOn(current_position)
           for unit in activated:
             # compose entry
             ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
@@ -388,6 +422,12 @@ if __name__ == '__main__':
           ### after each step check whether new sensor is activated
           activated = tt.updateMotionSensor(current_position)
 
+          for unit in activated:
+            # compose entry
+            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+            # append to outputData vector
+            outputSensorData.append( ppp )
+
           # find new position
           if momentumX > 0:
             x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
@@ -408,34 +448,34 @@ if __name__ == '__main__':
           # save position
           current_position = (x, y)
 
-          
-        
-          for unit in activated:
-            # compose entry
-            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
-            # append to outputData vector
-            outputSensorData.append( ppp )
-
           # update time
           stepTime = generators['step']()
           days, seconds, miliseconds = 0, stepTime, 0
           now += datetime.timedelta(days, seconds, miliseconds)
 
-        ## REMEMBER TO POSITION AT DOOR WHEN GOING TO NEXT ROOM
+        # memorise last position in previous room
+        previous_position = current_position
+        ## remember to position at door when going to next room
         current_position = sensors[room]['door'][current] #target_position
         # memorise current location - use later to navigate to activity
         current          = room
 
-      # on room exit switch off sensors which havent switched off
-      activated = tt.motionSensorsOn()
+      # Now you are in new room but haven't moved yet: check sensors
+      tt = monitor(current, sensors[current]['sensor'])
+      activated = tt.updateMotionSensor(current_position)
       for unit in activated:
-        print "ding"
         # compose entry
         ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
         # append to outputData vector
         outputSensorData.append( ppp )
 
 
+      # MARK YOUR PRESENCE AFTER YOU REAHED THE DESTNATION ROOM
+      # fix error - if you move VERTICALLY
+      # fix item & activity sensoros
+      # generate prolog ground truth of loctions
+      # Prolog rule: activity-a in sensor field m01
+      # add noise + incompleteness
 
       # check for reaching the target
       if current != goal:
