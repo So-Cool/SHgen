@@ -393,7 +393,7 @@ if __name__ == '__main__':
         ## find location of door
         target_position = sensors[current]['door'][room]
 
-        # Check if you're already there!!!!!!!!!!!!!
+        # Check if you're already there
         if current_position == target_position:
           neededSteps = -1
           activated = tt.motionSensorsOn(current_position)
@@ -407,7 +407,11 @@ if __name__ == '__main__':
           xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
           ## get momentum
           momentumX, momentumY = xb-xa, yb-ya
-          ## TODO: division by 0 if you are already there
+
+          # what if you move VERTICALLY: temporary workaround -- rotate 90o
+          if momentumX == 0:
+            xa, xb, ya, yb = ya, yb, xa, xb
+
           ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
           slope       = (ya-yb) / (xa-xb)
           intercept   = ya - slope * xa
@@ -431,9 +435,24 @@ if __name__ == '__main__':
           # find new position
           if momentumX > 0:
             x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
-          else:
+            y = slope * x + intercept
+          elif momentumX < 0:
             x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
-          y = slope * x + intercept
+            y = slope * x + intercept
+          elif momentumX == 0: # what if you move VERTICALLY
+            if momentumY > 0:
+              y = current_position[1] + sqrt( stepSize**2 / (slope**2 +1) )
+              x = slope * y + intercept
+            elif momentumY < 0:
+              y = current_position[1] - sqrt( stepSize**2 / (slope**2 +1) )
+              x = slope * y + intercept
+            else:
+              print "Internal error: panic attack!"
+              sys.exit(1)
+          else:
+            print "Internal error: panic attack!"
+            sys.exit(1)
+          
           ## increment step along distance form *current* towards *target*
           
           # Trim new position to room size
@@ -469,19 +488,11 @@ if __name__ == '__main__':
         # append to outputData vector
         outputSensorData.append( ppp )
 
-
-      # MARK YOUR PRESENCE AFTER YOU REAHED THE DESTNATION ROOM
-      # fix error - if you move VERTICALLY
-      # fix item & activity sensoros
-      # generate prolog ground truth of loctions
-      # Prolog rule: activity-a in sensor field m01
-      # add noise + incompleteness
-
       # check for reaching the target
       if current != goal:
         print "Path did not converge!"
         sys.exit(1)
-    elif move[0] == 'do': # action
+    elif move[0] == 'do': # action: item & activity sensors
       # find position of sensor in current room
       for i in sensors[current]['sensor']:
         if move[1] == i[3]:
@@ -491,7 +502,10 @@ if __name__ == '__main__':
       # go to this position 
       # go()
       # do the activity: emulate sensors
-      pass
+      ## activate sensor
+
+      ## emulate activity time
+      ## turn of activity sensor
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
@@ -501,3 +515,6 @@ if __name__ == '__main__':
   with open(dataFilename, 'wb') as datafile:
     datafile.write('\n'.join(outputSensorData))
     datafile.write('\n')
+
+# generate prolog ground truth of loctions
+# Prolog rule: activity-a in sensor field m01

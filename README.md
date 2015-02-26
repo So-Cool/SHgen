@@ -8,4 +8,5 @@ Generate labelled spatio-temporal data from:
 
 ## TODO:
 
+* add noise + incompleteness
 * multiple occupiers
