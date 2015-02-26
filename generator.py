@@ -56,6 +56,19 @@ class monitor:
     # return list of sensor with changed state
     return firedSensors
 
+  def motionSensorsOn(self):
+    firedSensors = []
+    # find affected sensors
+    for sensor in self.truthTable['motion'].keys():
+      sensorStatus   = self.truthTable['motion'][sensor]['status']
+      # check if table-status agrees with current readings
+      if sensorStatus: # id ON
+        self.truthTable['motion'][sensor]['status'] = not(sensorStatus)
+        firedSensors.append( ( sensor, str(self.truthTable['motion'][sensor]['status']).lower()  ) )        
+
+    # return list of sensor with changed state
+    return firedSensors
+
   def affected(self, sensor, position):
     d = sqrt( (position[0]-sensor[0])**2 + (position[1]-sensor[1])**2 )
     # check proximity by inspecting position and radius
@@ -81,7 +94,8 @@ interconnected += "  " + connected + rev + "(A, X), not( member(X, V) )," + nl
 interconnected += "  (" + nl + "    " + "B = X" + nl + "  " + "; " + connected
 interconnected += "(X, B, [A|V])" + nl + "  " + "), !." + nl + nl
 
-interchangable = connected + rev + "(A, B) :-" + nl + "  " + connected + fact + "(A, B); " + connected + fact + "(B, A)." + nl + nl
+interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
+interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
 
 # sensor location keyword for Prolog facts
 sensorLocation = "sensorIn"
@@ -285,6 +299,8 @@ if __name__ == '__main__':
     sys.exit(1)
   ## initialise location variables
   current = None
+  # initialise time
+  now = datetime.datetime.now()
   ## get output data stream
   outputSensorData = []
   # TODO: activity what is going on in Prolog as ground truth
@@ -292,6 +308,13 @@ if __name__ == '__main__':
   for move in path:
     if move[0] == 'start': # location
       current = move[1]
+      # get position in start room with cm accuracy
+      ## get dimensions
+      dims = sensors[current]['dimension']
+      ## change from meters to cent-meters
+      dims = tuple( [100*x for x in dims] )
+      ## get random position
+      current_position = ( float(randint(0, dims[0]))/100.0, float(randint(0, dims[1]))/100.0 )
     elif move[0] == 'go': # location
       # move from current to new_location
       ## Find path in adjacency matrix -- BFS
@@ -325,36 +348,39 @@ if __name__ == '__main__':
       if sequence.pop(0) != current:
         print "Internal error: origin does not match!"
         sys.exit(1)
-      # get position in start room with cm accuracy
-      ## get dimensions
-      dims = sensors[current]['dimension']
-      ## change from meters to cent-meters
-      dims = tuple( [100*x for x in dims] )
-      ## get random position
-      current_position = ( float(randint(0, dims[0])), float(randint(0, dims[1])) )
-      # remember
-      current = current
 
-      # initialise time
-      now = datetime.datetime.now()
       for room in sequence:
+        print "current", current
+        print "room", room
+        # initialise truth table for current tomorrow
+        tt = monitor(sensors[current]['sensor'])
+
         # go from location in previous to door to *room*
         ## find location of door
         target_position = sensors[current]['door'][room]
-        ## search the path
-        xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
-        ## get momentum
-        momentumX, momentumY = xb-xa, yb-ya
-        ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
-        slope       = (ya-yb) / (xa-xb)
-        # intercept   = ya - slope * xa
-        ### find the length of path
-        distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
-        ### divide step-wise based on *stepSize*
-        neededSteps = int(ceil( distance / stepSize ))
 
-        # initialise truth table for current tomorrow
-        tt = monitor(sensors[current]['sensor'])
+        # Check if you're already there
+        if current_position == target_position:
+          neededSteps = -1
+          activated = tt.updateMotionSensor(current_position)
+          for unit in activated:
+            # compose entry
+            ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+            # append to outputData vector
+            outputSensorData.append( ppp )
+        else:
+          ## search the path
+          xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
+          ## get momentum
+          momentumX, momentumY = xb-xa, yb-ya
+          ## TODO: division by 0 if you are already there
+          ## TODO: for the moment it is straight line between origin and goal - can be randomised a bit
+          slope       = (ya-yb) / (xa-xb)
+          intercept   = ya - slope * xa
+          ### find the length of path
+          distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
+          ### divide step-wise based on *stepSize*
+          neededSteps = int(ceil( distance / stepSize ))
 
         ### do steps +1 for current position
         for i in range(neededSteps+1):
@@ -363,11 +389,26 @@ if __name__ == '__main__':
           activated = tt.updateMotionSensor(current_position)
 
           # find new position
-          x1 = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
-          x2 = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
+          if momentumX > 0:
+            x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
+          else:
+            x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
+          y = slope * x + intercept
           ## increment step along distance form *current* towards *target*
-          # current_position = 
+          
           # Trim new position to room size
+          if x > sensors[current]['dimension'][0]:
+            x = sensors[current]['dimension'][0]
+          elif x < 0:
+            x = 0
+          if y > sensors[current]['dimension'][1]:
+            y = sensors[current]['dimension'][1]
+          elif y < 0:
+            y  = 0
+          # save position
+          current_position = (x, y)
+
+          
         
           for unit in activated:
             # compose entry
@@ -380,9 +421,20 @@ if __name__ == '__main__':
           days, seconds, miliseconds = 0, stepTime, 0
           now += datetime.timedelta(days, seconds, miliseconds)
 
+        ## REMEMBER TO POSITION AT DOOR WHEN GOING TO NEXT ROOM
+        current_position = sensors[room]['door'][current] #target_position
         # memorise current location - use later to navigate to activity
         current          = room
-        current_position = target_position
+
+      # on room exit switch off sensors which havent switched off
+      activated = tt.motionSensorsOn()
+      for unit in activated:
+        print "ding"
+        # compose entry
+        ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
+        # append to outputData vector
+        outputSensorData.append( ppp )
+
 
 
       # check for reaching the target
