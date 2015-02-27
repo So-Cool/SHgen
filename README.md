@@ -8,6 +8,7 @@ Generate labelled spatio-temporal data from:
 
 ## TODO:
 
+* Prolog ground truth + query mechanism at time for **activity**
 * position rounding issue
 * add noise + incompleteness
 * multiple occupiers
