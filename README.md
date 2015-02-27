@@ -8,5 +8,6 @@ Generate labelled spatio-temporal data from:
 
 ## TODO:
 
+* position rounding issue
 * add noise + incompleteness
 * multiple occupiers

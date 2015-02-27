@@ -3,6 +3,7 @@
 import sys
 import csv
 import datetime
+import time
 from numpy.random import normal
 from math import sqrt, ceil
 from random import randint
@@ -108,6 +109,8 @@ class monitor:
     sensorState = 'false'
     return [(sensorID, sensorState)]
     
+# time window length in microsecond (10^-6): 5 seconds
+WINDOWLENGTH = 5 * 1000000
 
 # Define predicate name for connected rooms - background knowledge
 connected = "connected"
@@ -125,8 +128,12 @@ interconnected += "(X, B, [A|V])" + nl + "  " + "), !." + nl + nl
 interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
 interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
 
-# sensor location keyword for Prolog facts
-sensorLocation = "sensorIn"
+# sensor location(room) keyword for Prolog facts
+sensorLocation = "sensorInRoom"
+# sensor item assigned to motion sensor keyword for Prolog facts
+sensorField = "sensorInField"
+# in place at time --- keyword for Prolog facts
+spaceTime = "spaceTime"
 # activity fixed to sensor keyword for Prolog bg
 sensorActivity = "sensorActivity"
 
@@ -140,6 +147,90 @@ dataFilename = "data.txt"
 stepSize = .5
 
 # Define functions
+
+# assign activity/item sensor to motion field sensor
+def itemToLocation(sensors):
+  readings = []
+  # divide into item and motion
+  for room in sensors:
+    motion = []
+    item   = []
+    for sensor in sensors[room]['sensor']:
+      if type(sensor[3]) == str:
+        item.append(sensor)
+      elif type(sensor[3]) == float:
+        motion.append(sensor)
+      else:
+        print "Sensor identification error"
+        sys.exit(1)
+    # for each sensor check...
+    fieldFound = False
+    for i in item:
+      fieldFound = False
+      # ...to which field it belongs
+      for area in motion:
+        d = sqrt( (i[1]-area[1])**2 + (i[2]-area[2])**2 )
+        if d <= area[3]:
+          fieldFound = True
+          readings.append( sensorField + "(" + i[0] + ", " + area[0] + ")." )
+      # if no field found
+      if not(fieldFound):
+        readings.append( sensorField + "(" + i[0] + ", " + "none" + ")." )
+
+  # write to file
+  with open(bgFilename, 'ab') as bg:
+    bg.write( '\n' )
+    bg.write( '\n'.join(readings) )
+    bg.write( '\n' )
+
+# get time window of event
+def get_window( initTime, currentTime ):
+  diff = currentTime - initTime
+  # check for negativity
+  if diff < 0:
+    print "Negative time in get_window()!"
+    sys.exit(1)
+  # get window: 0--WINDOWLENGTH is 0
+  return int(diff/WINDOWLENGTH)
+
+
+# generate Prolog ground truth of locations at given time
+def nowInRoom(now, origin, sequence, current):
+  # get UNIX timestamp
+  tsn = time.mktime(now.timetuple())
+  # append nano seconds and convert to microseconds
+  tsn *= 1000000
+  tsn += now.microsecond
+  tsn = int(tsn)
+
+  tso = time.mktime(origin.timetuple())
+  # append nano seconds and convert to microseconds
+  tso *= 1000000
+  tso += origin.microsecond
+  tso = int(tso)
+
+  # output
+  facts = []
+  # represent time in 4 different ways
+  t = []
+  t.append(str(tsn-tso)) # relative
+  t.append(str(tsn))     # absolute
+  t.append(str(sequence)) # sequence
+  t.append(str(get_window(tso, tsn))) # windowed
+
+  # prepare to write to file
+  facts.append( spaceTime + "(" + current + ", " + "relative, " + t[0] + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "absolute, " + t[1] + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "sequence, " + t[2] + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "windowed, " + t[3] + ")." )
+
+  # write to file
+  with open(bgFilename, 'ab') as bg:
+    bg.write( '\n' )
+    bg.write( '\n'.join(facts) )
+    bg.write( '\n' )
+
+
 ## Read in adjacency matrix
 def rooms( Fadj ):
   rooms = []
@@ -356,12 +447,15 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
 
     # find new position
     ## increment step along distance form *current* towards *target*
-    if momentumX > 0:
-      x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
-      y = slope * x + intercept
-    elif momentumX < 0:
-      x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
-      y = slope * x + intercept
+    if momentumX > 0 or momentumX < 0:
+      if momentumX > 0:
+        x = current_position[0] + sqrt( stepSize**2 / (slope**2 +1) )
+        y = slope * x + intercept
+      elif momentumX < 0:
+        x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
+        y = slope * x + intercept
+      #Trim new position to room size
+
     elif momentumX == 0: # what if you move VERTICALLY
       if momentumY > 0:
         y = current_position[1] + sqrt( stepSize**2 / (slope**2 +1) )
@@ -415,6 +509,9 @@ if __name__ == '__main__':
   path = path( Fpath )
   sensors = layout( Flay, roomLayout.keys() )
 
+  # assign locations to sensor for Prolog ground truth
+  itemToLocation(sensors)
+
   # generate random paths with timestamps
   ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
   if path[0][0] != 'start':
@@ -427,7 +524,7 @@ if __name__ == '__main__':
   ## remember previous position
   previous_position = None
   # initialise time
-  now = datetime.datetime.now()
+  now = theVeryBegining = datetime.datetime.now()
   ## get output data stream
   outputSensorData = []
   # TODO: Add prior posterior for the directions!!!!!!
@@ -490,9 +587,16 @@ if __name__ == '__main__':
             # append new activities
             outputSensorData += updateOutput(activated, now)
             # initialise new room
+
+            # generate Prolog ground truth of locations: DO NOT MOVE
+            nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+
             tt = monitor(current, sensors[current]['sensor'])
         else:
           tt = monitor(current, sensors[current]['sensor'])
+          
+          # generate Prolog ground truth of locations: DO NOT MOVE
+          nowInRoom(now, theVeryBegining, len(outputSensorData), current)
 
         # go from location in previous to door to *room*
         ## find location of door
@@ -509,6 +613,7 @@ if __name__ == '__main__':
         # memorise current location - use later to navigate to activity
         current          = room
 
+
       # Check whether old room has been cleaned
       print "Gerronimo, ", previous_position
       pprint(tt.display())
@@ -516,6 +621,9 @@ if __name__ == '__main__':
       pprint(tt.display())
       # append new activities
       outputSensorData += updateOutput(activated, now)
+
+      # generate Prolog ground truth of locations: DO NOT MOVE
+      nowInRoom(now, theVeryBegining, len(outputSensorData), current)
 
       # Now you are in new room but haven't moved yet: check sensors
       tt = monitor(current, sensors[current]['sensor'])
@@ -559,5 +667,3 @@ if __name__ == '__main__':
   with open(dataFilename, 'wb') as datafile:
     datafile.write('\n'.join(outputSensorData))
     datafile.write('\n')
-
-# generate Prolog ground truth of locations & activity as a in sensor field m01
