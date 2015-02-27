@@ -124,16 +124,21 @@ spaceTime = "spaceTime"
 sensorActivity = "sensorActivity"
 # define predicate name for querying place at time
 atLocation = "nowAt"
+# keyword for Prolog facts about current activity
+currentActivity = "activityTime"
+# keyword for Prolog activity query mechanism
+atActivity      = "nowDo"
+
 # Constants
 nl = '\n'
 fact = '__'
 rev  = '_'
 
-interconnected = connected + "(A, B) :-" + nl + "  " + connected + "(A, B, [])."
-interconnected += nl + connected + "(A, B, V) :-" + nl
+interconnected = connected + "(A, B, Path) :-" + nl + "  " + connected + "(A, B, [], Path)."
+interconnected += nl + connected + "(A, B, V, Path) :-" + nl
 interconnected += "  " + connected + rev + "(A, X), not( member(X, V) )," + nl
-interconnected += "  (" + nl + "    " + "B = X" + nl + "  " + "; " + connected
-interconnected += "(X, B, [A|V])" + nl + "  " + "), !." + nl + nl
+interconnected += "  (" + nl + "    " + "B = X, reverse([B,A|V], Path)" + nl + "  " + "; " + connected
+interconnected += "(X, B, [A|V], Path)" + nl + "  " + "), !." + nl + nl
 
 interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
 interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
@@ -146,20 +151,29 @@ whereAmI += "  %% ...which is before our time of interest..." + nl
 whereAmI += "  T =< Time," + nl
 whereAmI += "  %% ...and we do not move to any other room between *Time* and *T*" + nl
 whereAmI += "  \\+" + atLocation + rev + "(Room, TimeType, T, Time), !." + nl + nl
-
+########
 whereAmI += atLocation + rev + "(Room, TimeType, T1, T2) :-" + nl
 whereAmI += "  " + spaceTime + "(OtherRoom, TimeType, Tbound)," + nl
 whereAmI += "  \\+(OtherRoom = Room)," + nl
 whereAmI += "  T1 =< Tbound, Tbound =< T2." + nl + nl
+
+whatIDo  = atActivity + "(Activity, Time, TimeType) :-" + nl
+whatIDo += "  %% the activity is held at some time T..." + nl
+whatIDo += "  " + currentActivity + "(Activity, true, TimeType, T1)," + nl
+whatIDo += "  %% ...which started now or before our time of interest..." + nl
+whatIDo += "  T1 =< Time," + nl
+whatIDo += "  %% ... and has not ended yet." + nl
+whatIDo += "  \\+" + atActivity + rev + "(Activity, Time, TimeType)." + nl + nl
+#######
+whatIDo += atActivity + rev + "(Activity, Time, TimeType) :-" + nl
+whatIDo += "  " + currentActivity + "(Activity, false, TimeType, T)," + nl
+whatIDo += "  T =< Time." + nl + nl
 
 # Background knowledge file-name
 bgFilename = "bg.pl"
 
 # generated data file-name
 dataFilename = "data.txt"
-
-# step size in meters
-stepSize = .5
 
 # Define functions
 
@@ -197,6 +211,40 @@ def itemToLocation(sensors):
     bg.write( '\n' )
     bg.write( '\n'.join(readings) )
     bg.write( '\n' )
+
+
+# append current activity to ground truth
+def activityToTime(now, origin, sequence, activity, state):
+  # get UNIX timestamp
+  tsn = time.mktime(now.timetuple())
+  # append nano seconds and convert to microseconds
+  tsn *= 1000000
+  tsn += now.microsecond
+  tsn = int(tsn)
+
+  tso = time.mktime(origin.timetuple())
+  # append nano seconds and convert to microseconds
+  tso *= 1000000
+  tso += origin.microsecond
+  tso = int(tso)
+
+  # output
+  facts = []
+  # represent time in 4 different ways
+  t = []
+  t.append(str(tsn-tso)) # relative
+  t.append(str(tsn))     # absolute
+  t.append(str(sequence)) # sequence
+  t.append(str(get_window(tso, tsn))) # windowed
+
+  # prepare to write to file
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "relative, " + t[0] + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "absolute, " + t[1] + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "sequence, " + t[2] + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "windowed, " + t[3] + ")." )
+
+  return facts
+
 
 # get time window of event
 def get_window( initTime, currentTime ):
@@ -239,11 +287,7 @@ def nowInRoom(now, origin, sequence, current):
   facts.append( spaceTime + "(" + current + ", " + "sequence, " + t[2] + ")." )
   facts.append( spaceTime + "(" + current + ", " + "windowed, " + t[3] + ")." )
 
-  # write to file
-  with open(bgFilename, 'ab') as bg:
-    bg.write( '\n' )
-    bg.write( '\n'.join(facts) )
-    bg.write( '\n' )
+  return facts
 
 
 ## Read in adjacency matrix
@@ -272,7 +316,7 @@ def rooms( Fadj ):
     vals.append( dict(zip(keys, i)) )
   layout = dict(zip(keys, vals))
 
-  facts = [interconnected, interchangable, whereAmI]
+  facts = [interconnected, interchangable, whereAmI, whatIDo]
   keys1 = layout.keys()
   keys2 = layout.keys()
   for key1 in keys1:
@@ -327,11 +371,14 @@ def path( Fpath ):
   with open(Fpath, 'rb') as pathfile:
     for line in pathfile:
       line = line.strip('\n')
-
+      # strip spaces at the beginning
+      line = line[::-1]
+      line = line.strip(' ')
+      line = line[::-1]
       # check for comment or empty line
-      if line == []:
+      if line == "":
         continue
-      if line[0][0] == ';':
+      if line[0] == ';':
         continue
 
       f1 = line.find('(')
@@ -341,9 +388,20 @@ def path( Fpath ):
         sys.exit(1)
       command = line[:f1]
       argument = line[f1+1:f2]
+      # if there is comma in the argument it must be wait command
+      if command == 'wait':
+        # find comma
+        f3 = argument.find(',')
+        if f3 == -1:
+          print "Command wait has wrong argument: no comma in: ", argument
+          sys.exit(1)
+        argument1 = argument[:f3]
+        argument2 = argument[f3+1:]
+        argument = (float(argument1), float(argument2))
       # append tuple to path
       path.append( (command, argument) )
 
+  print path
   return path
 
 
@@ -398,18 +456,21 @@ def layout( Flay, keys ):
           print line
           sys.exit(1)
 
-  facts = []
+  facts1 = []
+  facts2 = []
   for k in sensors.keys():
     for r in sensors[k]['sensor']:
       # save sensor location - for motion sensors
-      facts.append( sensorLocation + "(" + r[0] + ", " + k + ")." )
+      facts1.append( sensorLocation + "(" + r[0] + ", " + k + ")." )
       # if this is item or activity sensor - remember additional activity fixed to sensor
       if type(r[3]) == str:
-        facts.append( sensorActivity + "(" + r[0] + ", " + r[3] + ")." )
+        facts2.append( sensorActivity + "(" + r[0] + ", " + r[3] + ")." )
 
   with open(bgFilename, 'ab') as bgfile:
       bgfile.write('\n')
-      bgfile.write('\n'.join(facts))
+      bgfile.write('\n'.join(facts1))
+      bgfile.write('\n\n')
+      bgfile.write('\n'.join(facts2))
       bgfile.write('\n')
 
   return sensors
@@ -450,6 +511,8 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
     ### find the length of path
     distance    = sqrt( (xb-xa)**2 + (yb-ya)**2 )
     ### divide step-wise based on *stepSize*
+    #### get stepSize
+    stepSize = generators['stepSize']()
     neededSteps = int(ceil( distance / stepSize ))
 
   ### do steps
@@ -500,7 +563,7 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
     current_position = (x, y)
 
     # update time
-    stepTime = generators['step']()
+    stepTime = generators['stepTime']()
     days, seconds, miliseconds = 0, stepTime, 0
     now += datetime.timedelta(days, seconds, miliseconds)
 
@@ -542,6 +605,9 @@ if __name__ == '__main__':
   now = theVeryBegining = datetime.datetime.now()
   ## get output data stream
   outputSensorData = []
+  ## get output data stream for Prolog ground truth
+  bindLocationTime = []
+  bindActivityTime = []
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if move[0] == 'start': # location
@@ -604,14 +670,14 @@ if __name__ == '__main__':
             # initialise new room
 
             # generate Prolog ground truth of locations: DO NOT MOVE
-            nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+            bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
 
             tt = monitor(current, sensors[current]['sensor'])
         else:
           tt = monitor(current, sensors[current]['sensor'])
           
           # generate Prolog ground truth of locations: DO NOT MOVE
-          nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+          bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
 
         # go from location in previous to door to *room*
         ## find location of door
@@ -638,7 +704,7 @@ if __name__ == '__main__':
       outputSensorData += updateOutput(activated, now)
 
       # generate Prolog ground truth of locations: DO NOT MOVE
-      nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
 
       # Now you are in new room but haven't moved yet: check sensors
       tt = monitor(current, sensors[current]['sensor'])
@@ -656,11 +722,13 @@ if __name__ == '__main__':
 
       # go to this position: remember to update current_position & previous_position
       # move within a room
-      print move[1]
+      print move[1], " : ", sensorID, " : ", target_position
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
       outputSensorData += readings
 
       # do the activity: emulate sensors
+      ## save ground truth: ON
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
@@ -669,6 +737,10 @@ if __name__ == '__main__':
       stepTime = generators[move[1]]()
       days, seconds, miliseconds = 0, stepTime, 0
       now += datetime.timedelta(days, seconds, miliseconds)
+
+      ## save ground truth: OFF
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false")
+
       ## turn of activity sensor
       activated = tt.deactivateItem(sensorID)
       ### append new activities
@@ -677,6 +749,14 @@ if __name__ == '__main__':
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
       sys.exit(1)
+
+  # write down Prolog rules
+  with open(bgFilename, 'ab') as bgf:
+    bgf.write('\n')
+    bgf.write( '\n'.join(bindActivityTime) )
+    bgf.write('\n\n')
+    bgf.write( '\n'.join(bindLocationTime) )
+    bgf.write('\n')
 
   # write generated data to file
   with open(dataFilename, 'wb') as datafile:
