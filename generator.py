@@ -114,6 +114,16 @@ WINDOWLENGTH = 5 * 1000000
 
 # Define predicate name for connected rooms - background knowledge
 connected = "connected"
+# sensor location(room) keyword for Prolog facts
+sensorLocation = "sensorInRoom"
+# sensor item assigned to motion sensor keyword for Prolog facts
+sensorField = "sensorInField"
+# in place at time --- keyword for Prolog facts
+spaceTime = "spaceTime"
+# activity fixed to sensor keyword for Prolog bg
+sensorActivity = "sensorActivity"
+# define predicate name for querying place at time
+atLocation = "nowAt"
 # Constants
 nl = '\n'
 fact = '__'
@@ -128,14 +138,19 @@ interconnected += "(X, B, [A|V])" + nl + "  " + "), !." + nl + nl
 interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
 interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
 
-# sensor location(room) keyword for Prolog facts
-sensorLocation = "sensorInRoom"
-# sensor item assigned to motion sensor keyword for Prolog facts
-sensorField = "sensorInField"
-# in place at time --- keyword for Prolog facts
-spaceTime = "spaceTime"
-# activity fixed to sensor keyword for Prolog bg
-sensorActivity = "sensorActivity"
+# check where you are
+whereAmI  = atLocation + "(Room, Time, TimeType) :-" + nl
+whereAmI += "  %% there is presence in given room at some time T..." + nl
+whereAmI += "  " + spaceTime + "(Room, TimeType, T)," + nl
+whereAmI += "  %% ...which is before our time of interest..." + nl
+whereAmI += "  T =< Time," + nl
+whereAmI += "  %% ...and we do not move to any other room between *Time* and *T*" + nl
+whereAmI += "  \\+" + atLocation + rev + "(Room, TimeType, T, Time), !." + nl + nl
+
+whereAmI += atLocation + rev + "(Room, TimeType, T1, T2) :-" + nl
+whereAmI += "  " + spaceTime + "(OtherRoom, TimeType, Tbound)," + nl
+whereAmI += "  \\+(OtherRoom = Room)," + nl
+whereAmI += "  T1 =< Tbound, Tbound =< T2." + nl + nl
 
 # Background knowledge file-name
 bgFilename = "bg.pl"
@@ -257,7 +272,7 @@ def rooms( Fadj ):
     vals.append( dict(zip(keys, i)) )
   layout = dict(zip(keys, vals))
 
-  facts = [interconnected, interchangable]
+  facts = [interconnected, interchangable, whereAmI]
   keys1 = layout.keys()
   keys2 = layout.keys()
   for key1 in keys1:
