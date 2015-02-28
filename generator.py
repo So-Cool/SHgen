@@ -112,6 +112,9 @@ class monitor:
 # time window length in microsecond (10^-6): 5 seconds
 WINDOWLENGTH = 5 * 1000000
 
+# number of different time representations used
+TIMEREPRESENTATIONS = 4
+
 # Define predicate name for connected rooms - background knowledge
 connected = "connected"
 # sensor location(room) keyword for Prolog facts
@@ -381,6 +384,21 @@ def path( Fpath ):
       if line[0] == ';':
         continue
 
+      # check for blocks
+      b1 = line.find('{')
+      b2 = line.find('}')
+      if b1 != -1 and b2 != -1:
+        print "Error: activity block starts and ends in the same line!"
+        sys.exit(1)
+      if b1 != -1:
+        # block begins
+        path.append( ('{', line[:b1].strip(' ')) )
+        continue
+      elif b2 != -1:
+        # block ends
+        path.append( ('}', line[b2+1:].strip(' ')) )
+        continue
+
       f1 = line.find('(')
       f2 = line.find(')')
       if f1 == -1 or f2 == -1:
@@ -401,7 +419,6 @@ def path( Fpath ):
       # append tuple to path
       path.append( (command, argument) )
 
-  print path
   return path
 
 
@@ -601,6 +618,10 @@ if __name__ == '__main__':
   tt = None
   ## remember previous position
   previous_position = None
+  ## time increment for block: act{...}act 
+  blockIncrementsCounter = 0
+  blockIncrements1 = []
+  blockIncrements2 = []
   # initialise time
   now = theVeryBegining = datetime.datetime.now()
   ## get output data stream
@@ -610,7 +631,7 @@ if __name__ == '__main__':
   bindActivityTime = []
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
-    if move[0] == 'start': # location
+    if   move[0] == 'start': # location
       current = move[1]
       # get position in start room with cm accuracy
       ## get dimensions
@@ -729,6 +750,12 @@ if __name__ == '__main__':
       # do the activity: emulate sensors
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
+
+      ## mark begining of activity block: needed to get true values
+      for trueValue in range(blockIncrementsCounter):
+        blockIncrements1.append( (now, theVeryBegining, len(outputSensorData)) )
+      blockIncrementsCounter = 0
+
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
@@ -745,10 +772,53 @@ if __name__ == '__main__':
       activated = tt.deactivateItem(sensorID)
       ### append new activities
       outputSensorData += updateOutput(activated, now)
+    elif move[0] == 'start':
+      pass
+    elif move[0] == 'stop':
+      pass
+    elif move[0] == '{':
+      # get yourself a space and prepare to get true values
+      bindActivityTime += [-1] #activityToTime(-1, -1, -1, move[1], "true")
+      blockIncrements2 += [ (move[1], "true") ]
+      blockIncrementsCounter += 1
+    elif move[0] == '}':
+      # mark end of activity block
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false")
+    elif move[0] == 'wait':
+      ## emulate time
+      seconds = normal(move[1][0], move[1][1])
+      days, miliseconds = 0, 0
+      now += datetime.timedelta(days, seconds, miliseconds)
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
       sys.exit(1)
+
+  # update block activities with true values
+  # check filler completeness
+  if len(blockIncrements1) != len(blockIncrements2) or blockIncrementsCounter != 0:
+    print "Filler part does not agree! ", blockIncrementsCounter
+    sys.exit(1)
+  quickFix = []
+  for counter, item in enumerate(bindActivityTime):
+    # fill gap if missing
+    if item == -1:
+      quickFix.append(counter)
+
+  quickFix.reverse() # reverse to pre... indexing
+  blockIncrements1.reverse()
+  blockIncrements2.reverse()
+  for qf in quickFix:
+    p1 = blockIncrements1.pop(0)
+    p2 = blockIncrements2.pop(0)
+    bindActivityTime.pop(qf)
+    appendix = activityToTime(p1[0], p1[1], p1[2], p2[0], p2[1])
+    appendix.reverse()
+    for entry in appendix:
+      bindActivityTime.insert(qf, entry)
+  if len(blockIncrements1) != len(blockIncrements2) or len(blockIncrements2) != 0:
+    print "Popping failed!"
+    sys.exit(1)
 
   # write down Prolog rules
   with open(bgFilename, 'ab') as bgf:

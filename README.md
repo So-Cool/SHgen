@@ -12,10 +12,8 @@ Generate labelled spatio-temporal data from:
 
 ## TODO:
 
-* add new *keywords*: **start**(*activity*), **wait**(*mu*, *sigma*), **finish**(*activity*) + add new keyword: **act** and **actDone**
-
-
 * position rounding issue
+
 * add noise + incompleteness
 * multiple occupiers
 
