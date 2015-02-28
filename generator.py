@@ -179,7 +179,6 @@ bgFilename = "bg.pl"
 dataFilename = "data.txt"
 
 # Define functions
-
 # assign activity/item sensor to motion field sensor
 def itemToLocation(sensors):
   readings = []
@@ -549,7 +548,20 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
       elif momentumX < 0:
         x = current_position[0] - sqrt( stepSize**2 / (slope**2 +1) )
         y = slope * x + intercept
+
       #Trim new position to room size
+      if x > sensors[current]['dimension'][0]:
+        x = sensors[current]['dimension'][0]
+        y = slope * x + intercept
+      elif x < 0:
+        x = 0
+        y = slope * x + intercept
+      if y > sensors[current]['dimension'][1]:
+        y = sensors[current]['dimension'][1]
+        x = (y - intercept) / slope
+      elif y < 0:
+        y  = 0
+        x = (y - intercept) / slope
 
     elif momentumX == 0: # what if you move VERTICALLY
       if momentumY > 0:
@@ -561,21 +573,39 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
       else:
         print "Internal error: panic attack!"
         sys.exit(1)
+
+      #Trim new position to room size: possible error?
+      if y > sensors[current]['dimension'][1]:
+        y = sensors[current]['dimension'][1]
+        x = slope * y + intercept
+      elif y < 0:
+        y  = 0
+        x = slope * y + intercept
+      if x > sensors[current]['dimension'][0]:
+        x = sensors[current]['dimension'][0]
+        y = (x - intercept) / slope
+      elif x < 0:
+        x = 0
+        y = (x - intercept) / slope
+
     else:
       print "Internal error: panic attack!"
       sys.exit(1)
-    
-    
-    
+
     # Trim new position to room size
     if x > sensors[current]['dimension'][0]:
       x = sensors[current]['dimension'][0]
+      print "Warning: aftershave!"
     elif x < 0:
       x = 0
+      print "Warning: aftershave!"
     if y > sensors[current]['dimension'][1]:
       y = sensors[current]['dimension'][1]
+      print "Warning: aftershave!"
     elif y < 0:
       y  = 0
+      print "Warning: aftershave!"
+
     # save position
     current_position = (x, y)
 
@@ -717,10 +747,7 @@ if __name__ == '__main__':
 
 
       # Check whether old room has been cleaned
-      print "Gerronimo, ", previous_position
-      pprint(tt.display())
       activated = tt.motionSensorsOn(previous_position)
-      pprint(tt.display())
       # append new activities
       outputSensorData += updateOutput(activated, now)
 
@@ -742,7 +769,6 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      print move[1], " : ", sensorID, " : ", target_position
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
       outputSensorData += readings
 
@@ -792,9 +818,6 @@ if __name__ == '__main__':
       activated = tt.activateItem(sensorID)
       ### append new activities
       outputSensorData += updateOutput(activated, now)
-
-
-
     elif move[0] == 'stop':
       # find position of sensor in current room
       (sensorID, target_position) = tt.getItemDetails(move[1])
@@ -810,7 +833,6 @@ if __name__ == '__main__':
       activated = tt.deactivateItem(sensorID)
       ### append new activities
       outputSensorData += updateOutput(activated, now)
-
     elif move[0] == '{':
       # get yourself a space and prepare to get true values
       bindActivityTime += [-1] #activityToTime(-1, -1, -1, move[1], "true")
