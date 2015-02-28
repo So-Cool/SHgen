@@ -609,7 +609,7 @@ if __name__ == '__main__':
 
   # generate random paths with timestamps
   ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
-  if path[0][0] != 'start':
+  if path[0][0] != 'origin':
     print "First action is not 'start'!"
     sys.exit(1)
   ## initialise location variables
@@ -631,7 +631,7 @@ if __name__ == '__main__':
   bindActivityTime = []
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
-    if   move[0] == 'start': # location
+    if   move[0] == 'origin': # location
       current = move[1]
       # get position in start room with cm accuracy
       ## get dimensions
@@ -741,8 +741,7 @@ if __name__ == '__main__':
       # find position of sensor in current room
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
-      # go to this position: remember to update current_position & previous_position
-      # move within a room
+      # move within a room: go to this position: remember to update current_position & previous_position !!!!
       print move[1], " : ", sensorID, " : ", target_position
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
       outputSensorData += readings
@@ -751,7 +750,7 @@ if __name__ == '__main__':
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
 
-      ## mark begining of activity block: needed to get true values
+      ## mark beginning of activity block: needed to get true values
       for trueValue in range(blockIncrementsCounter):
         blockIncrements1.append( (now, theVeryBegining, len(outputSensorData)) )
       blockIncrementsCounter = 0
@@ -773,9 +772,45 @@ if __name__ == '__main__':
       ### append new activities
       outputSensorData += updateOutput(activated, now)
     elif move[0] == 'start':
-      pass
+      # find position of sensor in current room
+      (sensorID, target_position) = tt.getItemDetails(move[1])
+
+      # move within a room: go to this position: remember to update current_position & previous_position !!!!
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      outputSensorData += readings
+
+      # do the activity: emulate sensors
+      ## save ground truth: ON
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
+
+      ## mark beginning of activity block: needed to get true values
+      for trueValue in range(blockIncrementsCounter):
+        blockIncrements1.append( (now, theVeryBegining, len(outputSensorData)) )
+      blockIncrementsCounter = 0
+
+      ## activate sensor
+      activated = tt.activateItem(sensorID)
+      ### append new activities
+      outputSensorData += updateOutput(activated, now)
+
+
+
     elif move[0] == 'stop':
-      pass
+      # find position of sensor in current room
+      (sensorID, target_position) = tt.getItemDetails(move[1])
+
+      # move within a room: go to this position: remember to update current_position & previous_position !!!!
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      outputSensorData += readings
+
+      ## save ground truth: OFF
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false")
+
+      ## turn of activity sensor
+      activated = tt.deactivateItem(sensorID)
+      ### append new activities
+      outputSensorData += updateOutput(activated, now)
+
     elif move[0] == '{':
       # get yourself a space and prepare to get true values
       bindActivityTime += [-1] #activityToTime(-1, -1, -1, move[1], "true")
