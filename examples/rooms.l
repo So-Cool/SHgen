@@ -1,0 +1,10 @@
+ [X]          wardrobe_1 room_1 wardrobe_2 room_2 hall cupboard bathroom living_room kitchen 
+ wardrobe_1  0 1 0 0 0 0 0 0 0
+ room_1      1 0 0 0 1 0 0 0 0
+ wardrobe_2  0 0 0 1 0 0 0 0 0
+ room_2      0 0 1 0 1 0 0 0 0
+ hall        0 1 0 1 0 1 1 1 0
+ cupboard    0 0 0 0 1 0 0 0 0
+ bathroom    0 0 0 0 1 0 0 0 0
+ living_room 0 0 0 0 1 0 0 0 1
+ kitchen     0 0 0 0 0 0 0 1 0

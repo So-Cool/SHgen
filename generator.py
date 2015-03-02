@@ -7,7 +7,7 @@ import time
 from numpy.random import normal
 from math import sqrt, ceil
 from random import randint
-from pprint import pprint
+# from pprint import pprint
 
 # Gaussian generator class
 class genGaus:
@@ -626,7 +626,7 @@ if __name__ == '__main__':
     sys.exit(1)
 
   # load files
-  Fadj, Fact, Fpath, Flay = args[1], args[2], args[3], args[4]
+  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
 
   # read in house specification
   roomLayout = rooms( Fadj )
