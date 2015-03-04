@@ -147,6 +147,7 @@ The following commands can be used:
 * `wait(mu, sigma)` - fast forward the clock by generating time (in seconds) according to normal distribution with parameters *mean* and *standard deviation*; the agent does not move,
 * `stop(item)` - approach the *item* and turn the sensor *off*,
 * `return(item) - go to the place the *item* is located,
+* `wander(x, y)` - go to (x, y) position within current room,
 * `activityName{...}activityName` - activity blocks starting with `activityName{` and finished with `}activityName`; used only for ground truth generation.
 
 In above commands `place` is room name as specified above and `item` is sensor identifier as specified above.
@@ -214,8 +215,9 @@ Time is represented in four different ways:
 ## To do: ##
 Introduce:
 
-- [ ] noise & incompleteness
+- [ ] noise & incompleteness (e.g. throw away some readings)
 - [ ] multiple occupiers
 - [ ] obstacles (furniture)
 - [ ] improve 'stepping' <!--each step randomly generated; no distance calculation at the beginning; step until you're there--->
-- [ ] add command to go to given position in particular room
+- [ ] update *output* section of `README.md` file
+- [X] add command to go to given position in particular room
