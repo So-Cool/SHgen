@@ -1,3 +1,7 @@
 # Mac OS X files
 .DS_Store
 
+# Script output
+*.txt
+*.pl
+
