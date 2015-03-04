@@ -31,6 +31,9 @@ eat{
   stop(table)
   phone_call{
     do(phone)
+    wander(5, 5)
+    wander(1, 5)
+    wander(5, 1)
   }phone_call
   start(table)
   wait(1020, 75)
