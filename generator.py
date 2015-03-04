@@ -119,6 +119,8 @@ TIMEREPRESENTATIONS = 4
 connected = "connected"
 # sensor location(room) keyword for Prolog facts
 sensorLocation = "sensorInRoom"
+motionSensorInRoom = "motionSensorInRoom"
+itemSensorInRoom   = "itemSensorInRoom"
 # sensor item assigned to motion sensor keyword for Prolog facts
 sensorField = "sensorInField"
 # in place at time --- keyword for Prolog facts
@@ -171,6 +173,46 @@ whatIDo += "  \\+" + atActivity + rev + "(Activity, Time, TimeType)." + nl + nl
 whatIDo += atActivity + rev + "(Activity, Time, TimeType) :-" + nl
 whatIDo += "  " + currentActivity + "(Activity, false, TimeType, T)," + nl
 whatIDo += "  T =< Time." + nl + nl
+
+locationSpecifier  = "location(Time, Location) :-" + nl
+locationSpecifier += "  sensorInRoom(SensorID, Location)," + nl
+locationSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
+
+
+deviceSpecifier  = "device(Time, Device) :-" + nl
+deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
+deviceSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
+
+
+sensorStateRule  = "sensor_state(SensorID, SensorState, Time) :-" + nl
+sensorStateRule += "  sensor_state(SensorID, SensorState, sequence, Time)." + nl + nl
+##
+sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, Time) :-"
+sensorStateRule += "  %% there is sensor in given state..." + nl
+sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T1)," + nl
+sensorStateRule += "  % ... before our time of interest..." + nl
+sensorStateRule += "  T1 =< Time," + nl
+sensorStateRule += "  %% ...and its status does not change after that." + nl
+sensorStateRule += "  negate(NotSensor, SensorState),"
+sensorStateRule += "  \\+sensor_state(SensorID, NotSensor, TimeType, T1, Time),!." + nl + nl
+##
+sensorStateRule += "%% sensor state between T1 and T2 inclusive"
+sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, T1, T2) :-" + nl
+sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T)," + nl
+sensorStateRule += "  T1 =< T, T =< T2." + nl + nl
+##
+sensorStateRule += "negate(Y, X) :-" + nl
+sensorStateRule += "  (X ->" + nl
+sensorStateRule += "   Y = false;" + nl
+sensorStateRule += "   Y = true)." + nl + nl
+
+sensorModes = "sensorModes(true)." + nl + "sensorModes(false)." + nl + nl
+
+roomIDs = "roomIDs"
+sensorIDs = "sensorsIDs"
+deviceIDs = "deviceIDs"
+activityIDs = "activityIDs"
+
 
 # Background knowledge file-name
 bgFilename = "bg.pl"
@@ -318,9 +360,15 @@ def rooms( Fadj ):
     vals.append( dict(zip(keys, i)) )
   layout = dict(zip(keys, vals))
 
-  facts = [interconnected, interchangable, whereAmI, whatIDo]
+  facts = [interconnected, interchangable, whereAmI, whatIDo, locationSpecifier, deviceSpecifier, sensorStateRule, sensorModes]
   keys1 = layout.keys()
   keys2 = layout.keys()
+
+  # get the room IDs
+  for k in keys1:
+    facts.append( roomIDs + "(" + k + ").\n" )
+  facts.append("\n")
+
   for key1 in keys1:
     for key2 in keys2:
       if layout[key1][key2]:
@@ -474,19 +522,44 @@ def layout( Flay, keys ):
 
   facts1 = []
   facts2 = []
+
+  facts3 = []
+  facts4 = []
+
+  facts5 = []
+  facts6 = []
   for k in sensors.keys():
     for r in sensors[k]['sensor']:
       # save sensor location - for motion sensors
       facts1.append( sensorLocation + "(" + r[0] + ", " + k + ")." )
       # if this is item or activity sensor - remember additional activity fixed to sensor
-      if type(r[3]) == str:
+      if type(r[3]) == str: # item sensor
         facts2.append( sensorActivity + "(" + r[0] + ", " + r[3] + ")." )
+
+        facts3.append( itemSensorInRoom + "(" + r[0] + ", " + k + ")." )
+
+        facts6.append( deviceIDs + "(" + r[3] + ")." )
+      elif type(r[3]) == float: # motion sensor
+        facts4.append( motionSensorInRoom + "(" + r[0] + ", " + k + ")." )
+      else: # unknown sensor
+        print "Unknown sensor type!"
+        sys.exit(1)
+
+      facts5.append( sensorIDs + "(" + r[0] + ")." )
 
   with open(bgFilename, 'ab') as bgfile:
       bgfile.write('\n')
       bgfile.write('\n'.join(facts1))
       bgfile.write('\n\n')
       bgfile.write('\n'.join(facts2))
+      bgfile.write('\n\n')
+      bgfile.write('\n'.join(facts3))
+      bgfile.write('\n\n')
+      bgfile.write('\n'.join(facts4))
+      bgfile.write('\n\n')
+      bgfile.write('\n'.join(facts5))
+      bgfile.write('\n\n')
+      bgfile.write('\n'.join(facts6))
       bgfile.write('\n')
 
   return sensors
@@ -659,6 +732,8 @@ if __name__ == '__main__':
   ## get output data stream for Prolog ground truth
   bindLocationTime = []
   bindActivityTime = []
+  ## memorise activities facts
+  activityFacts = []
   # TODO: Add prior posterior for the directions!!!!!!
   for move in path:
     if   move[0] == 'origin': # location
@@ -838,6 +913,11 @@ if __name__ == '__main__':
       bindActivityTime += [-1] #activityToTime(-1, -1, -1, move[1], "true")
       blockIncrements2 += [ (move[1], "true") ]
       blockIncrementsCounter += 1
+
+      # memorise facts
+      memid = activityIDs + "(" + move[1] + ")."
+      if not(memid in activityFacts):
+        activityFacts.append( memid )
     elif move[0] == '}':
       # mark end of activity block
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false")
@@ -887,6 +967,8 @@ if __name__ == '__main__':
   # write down Prolog rules
   with open(bgFilename, 'ab') as bgf:
     bgf.write('\n')
+    bgf.write( '\n'.join(activityFacts) )
+    bgf.write('\n\n')
     bgf.write( '\n'.join(bindActivityTime) )
     bgf.write('\n\n')
     bgf.write( '\n'.join(bindLocationTime) )
