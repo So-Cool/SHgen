@@ -94,18 +94,18 @@ class monitor:
     sys.exit(1)
 
   def activateItem(self, sensorID):
-    if self.truthTable['item'][sensorID]['status'] != False:
-      print "Item sensor state error A: ", sensorID
-      sys.exit(1)
-    self.truthTable['item'][sensorID]['status'] = True
+    # if self.truthTable['item'][sensorID]['status'] != False:
+    #   print "Item sensor state error A: ", sensorID
+    #   sys.exit(1)
+    # self.truthTable['item'][sensorID]['status'] = True
     sensorState = 'true'
     return [(sensorID, sensorState)]
 
   def deactivateItem(self, sensorID):
-    if self.truthTable['item'][sensorID]['status'] != True:
-      print "Item sensor state error D-A: ", sensorID
-      sys.exit(1)
-    self.truthTable['item'][sensorID]['status'] = False
+    # if self.truthTable['item'][sensorID]['status'] != True:
+    #   print "Item sensor state error D-A: ", sensorID
+    #   sys.exit(1)
+    # self.truthTable['item'][sensorID]['status'] = False
     sensorState = 'false'
     return [(sensorID, sensorState)]
     
@@ -846,6 +846,13 @@ if __name__ == '__main__':
       seconds = normal(move[1][0], move[1][1])
       days, miliseconds = 0, 0
       now += datetime.timedelta(days, seconds, miliseconds)
+    elif move[0] == 'return':
+      # find position of sensor in current room
+      (sensorID, target_position) = tt.getItemDetails(move[1])
+
+      # move within a room: go to this position: remember to update current_position & previous_position !!!!
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      outputSensorData += readings      
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
