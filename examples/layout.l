@@ -68,8 +68,9 @@ m76  5   3   1
 m77  1   5   1
 m78  3   5   1
 m79  5   5   1
+i76  1   2   tv
+i77  1   5   table
 i78  5.5 0.5 phone_book
-table-sensor    1   5   table
 asterisk 5.5 0.4 phone
 door 6   3   hall
 door 3   6   kitchen

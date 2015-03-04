@@ -1,26 +1,48 @@
 origin(hall)
 go(kitchen)
-; do cooking
 
-; do(cooking){
-  ; do(cabinet)
-  ; do(bowl)
-; }
 cook{
-  eat{
-    start(water_hot)
-    wait(100, 0.1)
-    stop(water_hot)
-  }eat
-  do(burner)
+  start(cabinet)
+    do(oatmeal)
+    do(raisins)
+    do(brown_sugar)
+    do(bowl)
+    do(measuring_spoon)
+    do(medicine_container)
+    do(pot)
+  stop(cabinet)
+  do(water_cold)
+  start(burner)
+
+  watchTV{
+    go(living_room)
+    do(tv)
+    go(kitchen)
+  }watchTV
+
+  stop(burner)
 }cook
 
-; go(living_room)
-; table == eat
-; do(table)
-; go(kitchen)
-; hot_water == wash_up
-; do(water_hot)
+go(living_room)
+
+eat{
+  start(table)
+  wait(300, 50)
+  stop(table)
+  phone_call{
+    do(phone)
+  }phone_call
+  start(table)
+  wait(1020, 75)
+  stop(table)
+}eat
+
+go(kitchen)
+
+wash_up{
+  do(water_hot)
+}wash_up
+
 go(hall)
 
 
