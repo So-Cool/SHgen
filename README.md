@@ -146,6 +146,7 @@ The following commands can be used:
 * `start(item)` - approach the *item* and turn the sensor *on*,
 * `wait(mu, sigma)` - fast forward the clock by generating time (in seconds) according to normal distribution with parameters *mean* and *standard deviation*; the agent does not move,
 * `stop(item)` - approach the *item* and turn the sensor *off*,
+* `return(item) - go to the place the *item* is located,
 * `activityName{...}activityName` - activity blocks starting with `activityName{` and finished with `}activityName`; used only for ground truth generation.
 
 In above commands `place` is room name as specified above and `item` is sensor identifier as specified above.
