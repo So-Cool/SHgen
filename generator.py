@@ -174,14 +174,41 @@ whatIDo += atActivity + rev + "(Activity, Time, TimeType) :-" + nl
 whatIDo += "  " + currentActivity + "(Activity, false, TimeType, T)," + nl
 whatIDo += "  T =< Time." + nl + nl
 
-locationSpecifier  = "location(Time, Location) :-" + nl
+locationSpecifier  = "location_(Time, Location) :-" + nl
 locationSpecifier += "  sensorInRoom(SensorID, Location)," + nl
 locationSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
+#######
+locationSpecifier += "location(Time, Location) :-" + nl
+locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
+locationSpecifier += "   sensor_state(SensorID, true, Time)," + nl
+locationSpecifier += "   Time >= 0, !  );" + nl
+locationSpecifier += "  %% think about cut at the end" + nl
+locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
+#####
+locationSpecifier += "location(Time, Location, State) :-" + nl
+locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
+locationSpecifier += "   sensor_state(SensorID, State, Time)," + nl
+locationSpecifier += "   Time >= 0, !  );" + nl
+locationSpecifier += "  %% think about cut at the end" + nl
+locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
+#####
+locationSpecifier += "%% return all activities between given times" + nl
+locationSpecifier += "locations(T1, T2, Loc) :-" + nl
+locationSpecifier += "  location(T1, Loc);" + nl
+locationSpecifier += "  (T1<T2, locations(T1+1, T2, Loc))." + nl + nl
 
 
 deviceSpecifier  = "device(Time, Device) :-" + nl
 deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
 deviceSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
+#####
+deviceSpecifier += "device(Time, Device, State) :-" + nl
+deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
+deviceSpecifier += "  sensor_state(SensorID, State, Time), !." + nl + nl
+#####
+deviceSpecifier += "devices(T1, T2, Dev) :-" + nl
+deviceSpecifier += "  device(T1, Dev);" + nl
+deviceSpecifier += "  (T1<T2, devices(T1+1, T2, Dev))." + nl + nl
 
 
 sensorStateRule  = "sensor_state(SensorID, SensorState, Time) :-" + nl
@@ -196,7 +223,7 @@ sensorStateRule += "  %% ...and its status does not change after that." + nl
 sensorStateRule += "  negate(NotSensor, SensorState),"
 sensorStateRule += "  \\+sensor_state(SensorID, NotSensor, TimeType, T1, Time),!." + nl + nl
 ##
-sensorStateRule += "%% sensor state between T1 and T2 inclusive"
+sensorStateRule += "%% sensor state between T1 and T2 inclusive" + nl
 sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, T1, T2) :-" + nl
 sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T)," + nl
 sensorStateRule += "  T1 =< T, T =< T2." + nl + nl
@@ -213,9 +240,17 @@ sensorIDs = "sensorsIDs"
 deviceIDs = "deviceIDs"
 activityIDs = "activityIDs"
 
+# prolog predicate name for activity model
+activityRule = "activity"
+
 
 # Background knowledge file-name
 bgFilename = "bg.pl"
+
+# give name WITHOUT extension for positive(ext '.f') and negative(ext '.n') examples
+posNegFilename = "data"
+posFilename = posNegFilename + ".f"
+negFilename = posNegFilename + ".n"
 
 # generated data file-name
 dataFilename = "data.txt"
@@ -289,6 +324,23 @@ def activityToTime(now, origin, sequence, activity, state):
 
   return facts
 
+# generate four different time representation tuple
+def generateTimeTuple(now, origin, sequence):
+  # get UNIX timestamp
+  tsn = time.mktime(now.timetuple())
+  # append nano seconds and convert to microseconds
+  tsn *= 1000000
+  tsn += now.microsecond
+  tsn = int(tsn)
+
+  tso = time.mktime(origin.timetuple())
+  # append nano seconds and convert to microseconds
+  tso *= 1000000
+  tso += origin.microsecond
+  tso = int(tso)
+
+  # (relative, absolute, sequence, windowed)
+  return ( tsn-tso, tsn, sequence, get_window(tso, tsn) )
 
 # get time window of event
 def get_window( initTime, currentTime ):
@@ -449,11 +501,11 @@ def path( Fpath ):
       f1 = line.find('(')
       f2 = line.find(')')
       if f1 == -1 or f2 == -1:
-        print "Path error: wrong format"
+        print "Path error: wrong format: ", line
         sys.exit(1)
       command = line[:f1]
       argument = line[f1+1:f2]
-      # if there is comma in the argument it must be wait command
+      # if there is comma in the argument it must be *wait* command or *wander*
       if command == 'wait':
         # find comma
         f3 = argument.find(',')
@@ -463,6 +515,18 @@ def path( Fpath ):
         argument1 = argument[:f3]
         argument2 = argument[f3+1:]
         argument = (float(argument1), float(argument2))
+
+      if command == 'wander':
+        #find comma
+        f3 = argument.find(',')
+        if f3 == -1:
+          print "Command wander has wrong argument: no comma in: ", argument
+          sys.exit(1)
+        argument1 = argument[:f3]
+        argument2 = argument[f3+1:]
+        argument = (float(argument1), float(argument2))
+
+
       # append tuple to path
       path.append( (command, argument) )
 
@@ -564,6 +628,7 @@ def layout( Flay, keys ):
 
   return sensors
 
+
 # generate entries to update sensor readings
 def updateOutput(activated, now):
   readings = []
@@ -573,6 +638,7 @@ def updateOutput(activated, now):
     # append to outputData vector
     readings.append( ppp )
   return readings
+
 
 # move within one room
 def moveWithinRoom(tt, current_position, target_position, now, generators, sensors):
@@ -689,6 +755,7 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
 
   return (readings, current_position, now)
 
+
 if __name__ == '__main__':
   # Check whether file is given as argument
   args = sys.argv
@@ -722,9 +789,7 @@ if __name__ == '__main__':
   ## remember previous position
   previous_position = None
   ## time increment for block: act{...}act 
-  blockIncrementsCounter = 0
-  blockIncrements1 = []
-  blockIncrements2 = []
+  blockIncrements = []
   # initialise time
   now = theVeryBegining = datetime.datetime.now()
   ## get output data stream
@@ -734,7 +799,8 @@ if __name__ == '__main__':
   bindActivityTime = []
   ## memorise activities facts
   activityFacts = []
-  # TODO: Add prior posterior for the directions!!!!!!
+  ## memorise activities ground truth: positives and negative
+  activityPosNeg = []
   for move in path:
     if   move[0] == 'origin': # location
       current = move[1]
@@ -848,13 +914,18 @@ if __name__ == '__main__':
       outputSensorData += readings
 
       # do the activity: emulate sensors
+      
+      ## mark beginning of activity block: needed to get true values
+      while len(blockIncrements) > 0:
+        trueValue = blockIncrements.pop(0)
+        bindActivityTime += activityToTime( now, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+        # memorise activity start & end for PosNeg generation #Aleph
+        gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData))
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
-
-      ## mark beginning of activity block: needed to get true values
-      for trueValue in range(blockIncrementsCounter):
-        blockIncrements1.append( (now, theVeryBegining, len(outputSensorData)) )
-      blockIncrementsCounter = 0
 
       ## activate sensor
       activated = tt.activateItem(sensorID)
@@ -881,13 +952,19 @@ if __name__ == '__main__':
       outputSensorData += readings
 
       # do the activity: emulate sensors
+      
+      ## mark beginning of activity block: needed to get true values
+      while len(blockIncrements) > 0:
+        trueValue = blockIncrements.pop(0)
+        bindActivityTime += activityToTime( now, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+        # memorise activity start & end for PosNeg generation #Aleph
+        gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData))
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+
+
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
-
-      ## mark beginning of activity block: needed to get true values
-      for trueValue in range(blockIncrementsCounter):
-        blockIncrements1.append( (now, theVeryBegining, len(outputSensorData)) )
-      blockIncrementsCounter = 0
 
       ## activate sensor
       activated = tt.activateItem(sensorID)
@@ -910,9 +987,7 @@ if __name__ == '__main__':
       outputSensorData += updateOutput(activated, now)
     elif move[0] == '{':
       # get yourself a space and prepare to get true values
-      bindActivityTime += [-1] #activityToTime(-1, -1, -1, move[1], "true")
-      blockIncrements2 += [ (move[1], "true") ]
-      blockIncrementsCounter += 1
+      blockIncrements += [ (move[1], "true") ]
 
       # memorise facts
       memid = activityIDs + "(" + move[1] + ")."
@@ -921,6 +996,15 @@ if __name__ == '__main__':
     elif move[0] == '}':
       # mark end of activity block
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false")
+
+      # memorise facts
+      memid = activityIDs + "(" + move[1] + ")."
+      if not(memid in activityFacts):
+        activityFacts.append( memid )
+
+      # memorise activity start & end for PosNeg generation #Aleph
+      gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData)-1)
+      activityPosNeg.append( (move[1], 'false', gtt) )
     elif move[0] == 'wait':
       ## emulate time
       seconds = normal(move[1][0], move[1][1])
@@ -932,37 +1016,70 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
-      outputSensorData += readings      
+      outputSensorData += readings
+    elif move[0] == 'wander':
+      target_position = move[1]
+      
+      if target_position[0] == -1 and target_position[1] == -1:
+        dims = sensors[current]['dimension']
+        ## change from meters to cent-meters
+        dims = tuple( [100*x for x in dims] )
+        ## get random position
+        target_position = ( float(randint(0, dims[0]))/100.0, float(randint(0, dims[1]))/100.0 )
+
+      # move within a room: go to this position: remember to update current_position & previous_position !!!!
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      outputSensorData += readings
     else:
       print "Action is not 'start', 'go', 'do'!"
       print "> ", move, " <"
       sys.exit(1)
 
-  # update block activities with true values
-  # check filler completeness
-  if len(blockIncrements1) != len(blockIncrements2) or blockIncrementsCounter != 0:
-    print "Filler part does not agree! ", blockIncrementsCounter
-    sys.exit(1)
-  quickFix = []
-  for counter, item in enumerate(bindActivityTime):
-    # fill gap if missing
-    if item == -1:
-      quickFix.append(counter)
 
-  quickFix.reverse() # reverse to pre... indexing
-  blockIncrements1.reverse()
-  blockIncrements2.reverse()
-  for qf in quickFix:
-    p1 = blockIncrements1.pop(0)
-    p2 = blockIncrements2.pop(0)
-    bindActivityTime.pop(qf)
-    appendix = activityToTime(p1[0], p1[1], p1[2], p2[0], p2[1])
-    appendix.reverse()
-    for entry in appendix:
-      bindActivityTime.insert(qf, entry)
-  if len(blockIncrements1) != len(blockIncrements2) or len(blockIncrements2) != 0:
-    print "Popping failed!"
-    sys.exit(1)
+  # generate positives and negatives - generate only for *sequence*
+  pos = []
+  neg = []
+  farEnd = len(outputSensorData)
+  while len(activityPosNeg) != 0:
+    # get first
+    a = []
+    a += [activityPosNeg.pop(0)]
+    # find all the rest of the activity
+    for i in range(len(activityPosNeg))[::-1]:
+      if activityPosNeg[i][0] == a[0][0]:
+        a.append( activityPosNeg.pop(i) )
+    
+    # for the moment forbid the same activity repeated within one file
+    # or the list does not start with *{* and finishes with *}*
+    if len(a) != 2 or a[0][1] != 'true' or a[1][1] != 'false':
+      print "The same block name used more than once: *", a[0][0], "* !"
+      print "or"
+      print "Wrong block structure!"
+      print ">\n", a
+      sys.exit(1)
+
+    # use only *sequence*
+    beginning = a[0][2][2]
+    end = a[1][2][2]
+    # generate for all the events
+    for i in range(beginning):
+      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+    for i in range(beginning, end):
+      pos.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+    for i in range(end, farEnd):
+      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+    ## generate for one event with range
+    # neg.append( activityRule + "(" + a[0][0] + ", " + str(0) + ", " + str(beginning-1) + ")." )
+    # pos.append( activityRule + "(" + a[0][0] + ", " + str(beginning) + ", " + str(end-1) + ")." )
+    # neg.append( activityRule + "(" + a[0][0] + ", " + str(end) + ", " + str(farEnd) + ")." )
+
+  # Write positive and negative examples
+  with open(posFilename, 'wb') as pf:
+    pf.write( '\n'.join(pos) )
+    pf.write('\n')
+  with open(negFilename, 'wb') as nf:
+    nf.write( '\n'.join(neg) )
+    nf.write('\n')
 
   # write down Prolog rules
   with open(bgFilename, 'ab') as bgf:
