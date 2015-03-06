@@ -5,3 +5,5 @@
 *.txt
 *.pl
 
+# User defined input
+*.ui
