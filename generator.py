@@ -756,6 +756,13 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
   return (readings, current_position, now)
 
 
+# change data into microsecond stamp
+def handleDate(s):
+  # d = ['2015-03-11 21:21:11', '471417']
+  d = ' '.join(s.split(' ')[:2])
+  return datetime.datetime.strptime( d, "%Y-%m-%d %H:%M:%S.%f" )
+
+
 if __name__ == '__main__':
   # Check whether file is given as argument
   args = sys.argv
@@ -858,7 +865,20 @@ if __name__ == '__main__':
             # on room exit switch off sensors which havent switched off & are within you range
             activated = tt.motionSensorsOn(previous_position)
             # append new activities
-            outputSensorData += updateOutput(activated, now)
+            ua = updateOutput(activated, now)
+            ##DONOTMOVE
+            if len(ua) != 0:
+              dt = handleDate(ua[0])
+              ## mark beginning of activity block: needed to get true values
+              while len(blockIncrements) > 0:
+                trueValue = blockIncrements.pop(0)
+                bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+                # memorise activity start & end for PosNeg generation #Aleph
+                gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+                activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+            ##DONOTMOVE
+            outputSensorData += ua
             # initialise new room
 
             # generate Prolog ground truth of locations: DO NOT MOVE
@@ -877,6 +897,18 @@ if __name__ == '__main__':
 
         # move within a room
         (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+        ##DONOTMOVE
+        if len(readings) != 0:
+          dt = handleDate(readings[0])
+          ## mark beginning of activity block: needed to get true values
+          while len(blockIncrements) > 0:
+            trueValue = blockIncrements.pop(0)
+            bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+            # memorise activity start & end for PosNeg generation #Aleph
+            gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+            activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+        ##DONOTMOVE
         outputSensorData += readings
 
         # memorise last position in previous room
@@ -890,7 +922,20 @@ if __name__ == '__main__':
       # Check whether old room has been cleaned
       activated = tt.motionSensorsOn(previous_position)
       # append new activities
-      outputSensorData += updateOutput(activated, now)
+      ua = updateOutput(activated, now)
+      ##DONOTMOVE
+      if len(ua) != 0:
+        dt = handleDate(ua[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
+      outputSensorData += ua
 
       # generate Prolog ground truth of locations: DO NOT MOVE
       bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
@@ -899,7 +944,20 @@ if __name__ == '__main__':
       tt = monitor(current, sensors[current]['sensor'])
       activated = tt.updateMotionSensor(current_position)
       # append new activities
-      outputSensorData += updateOutput(activated, now)
+      ua = updateOutput(activated, now)
+      ##DONOTMOVE
+      if len(ua) != 0:
+        dt = handleDate(ua[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
+      outputSensorData += ua
 
       # check for reaching the target
       if current != goal:
@@ -911,19 +969,33 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      ##DONOTMOVE
+      if len(readings) != 0:
+        dt = handleDate(readings[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
       outputSensorData += readings
 
-      # do the activity: emulate sensors
-      
+
+      # IN CASE YOU DIDN'T HAVE TO MOCE MEMORISE IT FOR SENSOR ACTIVITY
       ## mark beginning of activity block: needed to get true values
       while len(blockIncrements) > 0:
         trueValue = blockIncrements.pop(0)
-        bindActivityTime += activityToTime( now, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
 
         # memorise activity start & end for PosNeg generation #Aleph
-        gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData))
+        gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
         activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
 
+
+      # do the activity: emulate sensors
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
 
@@ -949,23 +1021,35 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      ##DONOTMOVE
+      if len(readings) != 0:
+        dt = handleDate(readings[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
       outputSensorData += readings
 
-      # do the activity: emulate sensors
-      
+
+      # IN CASE YOU DIDN'T HAVE TO MOCE MEMORISE IT FOR SENSOR ACTIVITY
       ## mark beginning of activity block: needed to get true values
       while len(blockIncrements) > 0:
         trueValue = blockIncrements.pop(0)
-        bindActivityTime += activityToTime( now, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
 
         # memorise activity start & end for PosNeg generation #Aleph
-        gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData))
+        gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
         activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
 
 
+      # do the activity: emulate sensors
       ## save ground truth: ON
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
-
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
@@ -976,7 +1060,29 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      ##DONOTMOVE
+      if len(readings) != 0:
+        dt = handleDate(readings[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
       outputSensorData += readings
+
+      # IN CASE YOU DIDN'T HAVE TO MOCE MEMORISE IT FOR SENSOR ACTIVITY
+      ## mark beginning of activity block: needed to get true values
+      while len(blockIncrements) > 0:
+        trueValue = blockIncrements.pop(0)
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+        # memorise activity start & end for PosNeg generation #Aleph
+        gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
 
       ## save ground truth: OFF
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false")
@@ -994,6 +1100,22 @@ if __name__ == '__main__':
       if not(memid in activityFacts):
         activityFacts.append( memid )
     elif move[0] == '}':
+      # check whether there was any activity to mark the beginning
+      beg = False
+      for aa in bindActivityTime:
+        if 'true' in aa and move[1] in aa:
+          beg = True
+          break
+      # if no beginning found append it now
+      if beg == False:
+        print "WARNING: no support for beginning of activity for block!"
+        bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "true")
+        # memorise activity start & end for PosNeg generation #Aleph
+        gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData)-1)
+        activityPosNeg.append( (move[1], 'true', gtt) )
+        # clean block beginning memory
+        blockIncrements = []
+
       # mark end of activity block
       bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false")
 
@@ -1006,6 +1128,12 @@ if __name__ == '__main__':
       gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData)-1)
       activityPosNeg.append( (move[1], 'false', gtt) )
     elif move[0] == 'wait':
+
+      ## mark beginning of activity block: needed to get true values
+      if len(blockIncrements) > 0:
+        print "Command *wait* cannot be the first element of block!"
+        sys.exit(1)
+
       ## emulate time
       seconds = normal(move[1][0], move[1][1])
       days, miliseconds = 0, 0
@@ -1016,6 +1144,18 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      ##DONOTMOVE
+      if len(readings) != 0:
+        dt = handleDate(readings[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
       outputSensorData += readings
     elif move[0] == 'wander':
       target_position = move[1]
@@ -1029,9 +1169,21 @@ if __name__ == '__main__':
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
       (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      ##DONOTMOVE
+      if len(readings) != 0:
+        dt = handleDate(readings[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
       outputSensorData += readings
     else:
-      print "Action is not 'start', 'go', 'do'!"
+      print "Action: *", move[0], "* not recognised!"
       print "> ", move, " <"
       sys.exit(1)
 
