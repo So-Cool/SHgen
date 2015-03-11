@@ -1188,6 +1188,13 @@ if __name__ == '__main__':
       sys.exit(1)
 
 
+  # add fifth sparse column to data - it indicates activities start and end
+  for (iname, istate, imeasure) in activityPosNeg:
+    seq = imeasure[2]
+    st = 'begin' if istate == 'true' else 'end'
+    addon = ' ' + iname + ' ' + st
+    outputSensorData[seq] += addon
+
   # generate positives and negatives - generate only for *sequence*
   pos = []
   neg = []
