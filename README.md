@@ -220,3 +220,4 @@ Introduce:
 - [ ] obstacles (furniture)
 - [ ] improve 'stepping' <!--each step randomly generated; no distance calculation at the beginning; step until you're there--->
 - [ ] update *output* section of `README.md` file: positives and negatives
+- [ ] update README: *wait* command cannot be the first command in block
