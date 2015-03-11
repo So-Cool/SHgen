@@ -4,6 +4,8 @@
 # Script output
 *.txt
 *.pl
+*.f
+*.n
 
 # User defined input
 *.ui
