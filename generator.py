@@ -139,101 +139,107 @@ nl = '\n'
 fact = '__'
 rev  = '_'
 
-interconnected = connected + "(A, B, Path) :-" + nl + "  " + connected + "(A, B, [], Path)."
-interconnected += nl + connected + "(A, B, V, Path) :-" + nl
-interconnected += "  " + connected + rev + "(A, X), not( member(X, V) )," + nl
-interconnected += "  (" + nl + "    " + "B = X, reverse([B,A|V], Path)" + nl + "  " + "; " + connected
-interconnected += "(X, B, [A|V], Path)" + nl + "  " + "), !." + nl + nl
+interconnected = ""
+# interconnected = connected + "(A, B, Path) :-" + nl + "  " + connected + "(A, B, [], Path)."
+# interconnected += nl + connected + "(A, B, V, Path) :-" + nl
+# interconnected += "  " + connected + rev + "(A, X), not( member(X, V) )," + nl
+# interconnected += "  (" + nl + "    " + "B = X, reverse([B,A|V], Path)" + nl + "  " + "; " + connected
+# interconnected += "(X, B, [A|V], Path)" + nl + "  " + "), !." + nl + nl
 
-interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
-interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
+interchangable = ""
+# interchangable  = connected + rev + "(A, B) :-" + nl + "  " + connected + fact
+# interchangable += "(A, B); " + connected + fact + "(B, A)." + nl + nl
 
 # check where you are
-whereAmI  = atLocation + "(Room, Time, TimeType) :-" + nl
-whereAmI += "  %% there is presence in given room at some time T..." + nl
-whereAmI += "  " + spaceTime + "(Room, TimeType, T)," + nl
-whereAmI += "  %% ...which is before our time of interest..." + nl
-whereAmI += "  T =< Time," + nl
-whereAmI += "  %% ...and we do not move to any other room between *Time* and *T*" + nl
-whereAmI += "  \\+" + atLocation + rev + "(Room, TimeType, T, Time), !." + nl + nl
-########
-whereAmI += atLocation + rev + "(Room, TimeType, T1, T2) :-" + nl
-whereAmI += "  " + spaceTime + "(OtherRoom, TimeType, Tbound)," + nl
-whereAmI += "  \\+(OtherRoom = Room)," + nl
-whereAmI += "  T1 =< Tbound, Tbound =< T2." + nl + nl
+whereAmI = ""
+# whereAmI  = atLocation + "(Room, Time, TimeType) :-" + nl
+# whereAmI += "  %% there is presence in given room at some time T..." + nl
+# whereAmI += "  " + spaceTime + "(Room, TimeType, T)," + nl
+# whereAmI += "  %% ...which is before our time of interest..." + nl
+# whereAmI += "  T =< Time," + nl
+# whereAmI += "  %% ...and we do not move to any other room between *Time* and *T*" + nl
+# whereAmI += "  \\+" + atLocation + rev + "(Room, TimeType, T, Time), !." + nl + nl
+# ########
+# whereAmI += atLocation + rev + "(Room, TimeType, T1, T2) :-" + nl
+# whereAmI += "  " + spaceTime + "(OtherRoom, TimeType, Tbound)," + nl
+# whereAmI += "  \\+(OtherRoom = Room)," + nl
+# whereAmI += "  T1 =< Tbound, Tbound =< T2." + nl + nl
 
-whatIDo  = atActivity + "(Activity, Time, TimeType) :-" + nl
-whatIDo += "  %% the activity is held at some time T..." + nl
-whatIDo += "  " + currentActivity + "(Activity, true, TimeType, T1)," + nl
-whatIDo += "  %% ...which started now or before our time of interest..." + nl
-whatIDo += "  T1 =< Time," + nl
-whatIDo += "  %% ... and has not ended yet." + nl
-whatIDo += "  \\+" + atActivity + rev + "(Activity, Time, TimeType)." + nl + nl
-#######
-whatIDo += atActivity + rev + "(Activity, Time, TimeType) :-" + nl
-whatIDo += "  " + currentActivity + "(Activity, false, TimeType, T)," + nl
-whatIDo += "  T =< Time." + nl + nl
+whatIDo = ""
+# whatIDo  = atActivity + "(Activity, Time, TimeType) :-" + nl
+# whatIDo += "  %% the activity is held at some time T..." + nl
+# whatIDo += "  " + currentActivity + "(Activity, true, TimeType, T1)," + nl
+# whatIDo += "  %% ...which started now or before our time of interest..." + nl
+# whatIDo += "  T1 =< Time," + nl
+# whatIDo += "  %% ... and has not ended yet." + nl
+# whatIDo += "  \\+" + atActivity + rev + "(Activity, Time, TimeType)." + nl + nl
+# #######
+# whatIDo += atActivity + rev + "(Activity, Time, TimeType) :-" + nl
+# whatIDo += "  " + currentActivity + "(Activity, false, TimeType, T)," + nl
+# whatIDo += "  T =< Time." + nl + nl
 
-locationSpecifier  = "location_(Time, Location) :-" + nl
-locationSpecifier += "  sensorInRoom(SensorID, Location)," + nl
-locationSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
-#######
-locationSpecifier += "location(Time, Location) :-" + nl
-locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
-locationSpecifier += "   sensor_state(SensorID, true, Time)," + nl
-locationSpecifier += "   Time >= 0, !  );" + nl
-locationSpecifier += "  %% think about cut at the end" + nl
-locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
-#####
-locationSpecifier += "location(Time, Location, State) :-" + nl
-locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
-locationSpecifier += "   sensor_state(SensorID, State, Time)," + nl
-locationSpecifier += "   Time >= 0, !  );" + nl
-locationSpecifier += "  %% think about cut at the end" + nl
-locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
-#####
-locationSpecifier += "%% return all activities between given times" + nl
-locationSpecifier += "locations(T1, T2, Loc) :-" + nl
-locationSpecifier += "  location(T1, Loc);" + nl
-locationSpecifier += "  (T1<T2, locations(T1+1, T2, Loc))." + nl + nl
+locationSpecifier = ""
+# locationSpecifier  = "location_(Time, Location) :-" + nl
+# locationSpecifier += "  sensorInRoom(SensorID, Location)," + nl
+# locationSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
+# #######
+# locationSpecifier += "location(Time, Location) :-" + nl
+# locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
+# locationSpecifier += "   sensor_state(SensorID, true, Time)," + nl
+# locationSpecifier += "   Time >= 0, !  );" + nl
+# locationSpecifier += "  %% think about cut at the end" + nl
+# locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
+# #####
+# locationSpecifier += "location(Time, Location, State) :-" + nl
+# locationSpecifier += "  (sensorInRoom(SensorID, Location)," + nl
+# locationSpecifier += "   sensor_state(SensorID, State, Time)," + nl
+# locationSpecifier += "   Time >= 0, !  );" + nl
+# locationSpecifier += "  %% think about cut at the end" + nl
+# locationSpecifier += "  ( !, Time > 0, location(Time-1, Location) )." + nl + nl
+# #####
+# locationSpecifier += "%% return all activities between given times" + nl
+# locationSpecifier += "locations(T1, T2, Loc) :-" + nl
+# locationSpecifier += "  location(T1, Loc);" + nl
+# locationSpecifier += "  (T1<T2, locations(T1+1, T2, Loc))." + nl + nl
 
+deviceSpecifier = ""
+# deviceSpecifier  = "device(Time, Device) :-" + nl
+# deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
+# deviceSpecifier += "  sensor_state(SensorID, true, Time)." + nl + nl#!
+# #####
+# deviceSpecifier += "device(Time, Device, State) :-" + nl
+# deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
+# deviceSpecifier += "  sensor_state(SensorID, State, Time)." + nl + nl#!
+# #####
+# deviceSpecifier += "devices(T1, T2, Dev) :-" + nl
+# deviceSpecifier += "  device(T1, Dev);" + nl
+# deviceSpecifier += "  (T1<T2, devices(T1+1, T2, Dev))." + nl + nl
 
-deviceSpecifier  = "device(Time, Device) :-" + nl
-deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
-deviceSpecifier += "  sensor_state(SensorID, true, Time), !." + nl + nl
-#####
-deviceSpecifier += "device(Time, Device, State) :-" + nl
-deviceSpecifier += "  sensorActivity(SensorID, Device)," + nl
-deviceSpecifier += "  sensor_state(SensorID, State, Time), !." + nl + nl
-#####
-deviceSpecifier += "devices(T1, T2, Dev) :-" + nl
-deviceSpecifier += "  device(T1, Dev);" + nl
-deviceSpecifier += "  (T1<T2, devices(T1+1, T2, Dev))." + nl + nl
+sensorStateRule = ""
+# sensorStateRule  = "sensor_state(SensorID, SensorState, Time) :-" + nl
+# sensorStateRule += "  sensor_state(SensorID, SensorState, sequence, Time)." + nl + nl
+# ##
+# sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, Time) :-"
+# sensorStateRule += "  %% there is sensor in given state..." + nl
+# sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T1)," + nl
+# sensorStateRule += "  % ... before our time of interest..." + nl
+# sensorStateRule += "  T1 =< Time," + nl
+# sensorStateRule += "  %% ...and its status does not change after that." + nl
+# sensorStateRule += "  negate(NotSensor, SensorState),"
+# sensorStateRule += "  \\+sensor_state(SensorID, NotSensor, TimeType, T1, Time),!." + nl + nl
+# ##
+# sensorStateRule += "%% sensor state between T1 and T2 inclusive" + nl
+# sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, T1, T2) :-" + nl
+# sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T)," + nl
+# sensorStateRule += "  T1 =< T, T =< T2." + nl + nl
+# ##
+# sensorStateRule += "negate(Y, X) :-" + nl
+# sensorStateRule += "  (X ->" + nl
+# sensorStateRule += "   Y = false;" + nl
+# sensorStateRule += "   Y = true)." + nl + nl
 
-
-sensorStateRule  = "sensor_state(SensorID, SensorState, Time) :-" + nl
-sensorStateRule += "  sensor_state(SensorID, SensorState, sequence, Time)." + nl + nl
-##
-sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, Time) :-"
-sensorStateRule += "  %% there is sensor in given state..." + nl
-sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T1)," + nl
-sensorStateRule += "  % ... before our time of interest..." + nl
-sensorStateRule += "  T1 =< Time," + nl
-sensorStateRule += "  %% ...and its status does not change after that." + nl
-sensorStateRule += "  negate(NotSensor, SensorState),"
-sensorStateRule += "  \\+sensor_state(SensorID, NotSensor, TimeType, T1, Time),!." + nl + nl
-##
-sensorStateRule += "%% sensor state between T1 and T2 inclusive" + nl
-sensorStateRule += "sensor_state(SensorID, SensorState, TimeType, T1, T2) :-" + nl
-sensorStateRule += "  sensor(SensorID, SensorState, TimeType, T)," + nl
-sensorStateRule += "  T1 =< T, T =< T2." + nl + nl
-##
-sensorStateRule += "negate(Y, X) :-" + nl
-sensorStateRule += "  (X ->" + nl
-sensorStateRule += "   Y = false;" + nl
-sensorStateRule += "   Y = true)." + nl + nl
-
-sensorModes = "sensorModes(true)." + nl + "sensorModes(false)." + nl + nl
+sensorModes = ""
+# sensorModes = "sensorModes(true)." + nl + "sensorModes(false)." + nl + nl
 
 roomIDs = "roomIDs"
 sensorIDs = "sensorsIDs"
@@ -1135,7 +1141,11 @@ if __name__ == '__main__':
         sys.exit(1)
 
       ## emulate time
-      seconds = normal(move[1][0], move[1][1])
+      ### if standard deviation is zero do not use randomness
+      if float(move[1][1]) != 0.0:
+        seconds = normal(move[1][0], move[1][1])
+      else:
+        seconds = move[1][0]
       days, miliseconds = 0, 0
       now += datetime.timedelta(days, seconds, miliseconds)
     elif move[0] == 'return':
