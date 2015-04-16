@@ -7,7 +7,7 @@ import time
 from numpy.random import normal
 from math import sqrt, ceil
 from random import randint
-# from pprint import pprint
+from pprint import pprint
 
 # Gaussian generator class
 class genGaus:
@@ -476,17 +476,29 @@ def activities( Fact ):
 # read in path
 def path( Fpath ):
   path = []
+  occupiers = {}
   with open(Fpath, 'rb') as pathfile:
     for line in pathfile:
-      line = line.strip('\n')
       # strip spaces at the beginning
-      line = line[::-1]
-      line = line.strip(' ')
-      line = line[::-1]
+      line = line.strip()
       # check for comment or empty line
       if line == "":
         continue
       if line[0] == ';':
+        continue
+
+      # check for multiple occupiers
+      o1 = line.find('>')
+      o2 = line.find('<')
+      if o1 != -1 and o2 != -1:
+        print "Error: personal log starts and ends in the same line!"
+        sys.exit(1)
+      if o1 != -1:
+        # do nothing - collect information to *path* and then append it
+        continue
+      elif o2 != -1:
+        occupiers[line.strip('<')] = path[:]
+        path = []
         continue
 
       # check for blocks
@@ -536,7 +548,11 @@ def path( Fpath ):
       # append tuple to path
       path.append( (command, argument) )
 
-  return path
+  # if multiple occupiers return occupiers otherwise return path
+  if bool(occupiers):
+    return occupiers
+  else:
+    return path
 
 
 # read in rooms layout into sensors dictionary
@@ -769,6 +785,10 @@ def handleDate(s):
   return datetime.datetime.strptime( d, "%Y-%m-%d %H:%M:%S.%f" )
 
 
+# pathfinder
+def pathFinder():
+  pass
+
 if __name__ == '__main__':
   # Check whether file is given as argument
   args = sys.argv
@@ -792,9 +812,19 @@ if __name__ == '__main__':
 
   # generate random paths with timestamps
   ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
-  if path[0][0] != 'origin':
-    print "First action is not 'start'!"
+  if type(path) == list:
+    if path[0][0] != 'origin':
+      print "First action is not 'origin'!"
+      sys.exit(1)
+  elif type(path) == dict:
+    for key in path:
+      if path[key][0][0] != 'origin':
+        print "First action of " + key + " is not 'origin'!"
+        sys.exit(1)
+  else:
+    print "Weird error #803, please contact support."
     sys.exit(1)
+
   ## initialise location variables
   current = None
   ## initialise sensor watchdog
