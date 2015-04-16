@@ -29,7 +29,7 @@ wash_hands{
   wait(30, 5)
   stop(water_hot)
   wait(3, 0)
-  stop(water_hot)
+  stop(water_cold)
   wander(-1, -1)
 }wash_hands
 
