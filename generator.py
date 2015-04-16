@@ -133,6 +133,8 @@ atLocation = "nowAt"
 currentActivity = "activityTime"
 # keyword for Prolog activity query mechanism
 atActivity      = "nowDo"
+# keyword Prolog for person ID
+personID = "person"
 
 # Constants
 nl = '\n'
@@ -263,7 +265,7 @@ dataFilename = "data.txt"
 
 # Define functions
 # assign activity/item sensor to motion field sensor
-def itemToLocation(sensors):
+def itemToLocation(sensors, persons):
   readings = []
   # divide into item and motion
   for room in sensors:
@@ -290,6 +292,12 @@ def itemToLocation(sensors):
       # if no field found
       if not(fieldFound):
         readings.append( sensorField + "(" + i[0] + ", " + "none" + ")." )
+
+  # append persons identifiers
+  readings.append('')
+  for person in persons:
+    pson = person[0].lower() + person[1:]
+    readings.append( personID+'(' + pson + ').' )
 
   # write to file
   with open(bgFilename, 'ab') as bg:
@@ -663,7 +671,7 @@ def updateOutput(activated, now):
 
 
 # move within one room
-def moveWithinRoom(tt, current_position, target_position, now, generators, sensors):
+def moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current):
   # sensors readings
   readings = []
   # Check if you're already there
@@ -786,45 +794,21 @@ def handleDate(s):
 
 
 # pathfinder
-def pathFinder():
-  pass
+def pathFinder(roomLayout, generators, pathpp, sensors):
+  def getPerson(sp):
+    return sp[0].lower() + sp[1:]
 
-if __name__ == '__main__':
-  # Check whether file is given as argument
-  args = sys.argv
-  if len(args) != 5:
-    # Fail
-    print "No files specified."
-    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
-    sys.exit(1)
-
-  # load files
-  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
-
-  # read in house specification
-  roomLayout = rooms( Fadj )
-  generators = activities( Fact )
-  path = path( Fpath )
-  sensors = layout( Flay, roomLayout.keys() )
-
-  # assign locations to sensor for Prolog ground truth
-  itemToLocation(sensors)
-
-  # generate random paths with timestamps
-  ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
-  if type(path) == list:
-    if path[0][0] != 'origin':
-      print "First action is not 'origin'!"
-      sys.exit(1)
-  elif type(path) == dict:
-    for key in path:
-      if path[key][0][0] != 'origin':
-        print "First action of " + key + " is not 'origin'!"
-        sys.exit(1)
+  occupierID = ""
+  mul = False
+  if type(pathpp) == dict:
+    occupierID += ", "
+    mul = True
+    ks = pathpp.keys()
+    path = pathpp.pop(ks[0], None)
   else:
-    print "Weird error #803, please contact support."
-    sys.exit(1)
+    path = pathpp
 
+  print path
   ## initialise location variables
   current = None
   ## initialise sensor watchdog
@@ -854,6 +838,31 @@ if __name__ == '__main__':
       dims = tuple( [100*x for x in dims] )
       ## get random position
       current_position = ( float(randint(0, dims[0]))/100.0, float(randint(0, dims[1]))/100.0 )
+
+
+      # Now you are in new room but haven't moved yet: check sensors
+      tt = monitor(current, sensors[current]['sensor'])
+      activated = tt.updateMotionSensor(current_position)
+      # append new activities
+      ua = updateOutput(activated, now)
+      ##DONOTMOVE
+      if len(ua) != 0:
+        dt = handleDate(ua[0])
+        ## mark beginning of activity block: needed to get true values
+        while len(blockIncrements) > 0:
+          trueValue = blockIncrements.pop(0)
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+
+          # memorise activity start & end for PosNeg generation #Aleph
+          gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+      ##DONOTMOVE
+      outputSensorData += ua
+      ###
+      # generate Prolog ground truth of locations: DO NOT MOVE
+      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+
+
     elif move[0] == 'go': # location
       # move from current to new_location
       ## Find path in adjacency matrix -- BFS
@@ -932,7 +941,7 @@ if __name__ == '__main__':
         target_position = sensors[current]['door'][room]
 
         # move within a room
-        (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+        (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
         ##DONOTMOVE
         if len(readings) != 0:
           dt = handleDate(readings[0])
@@ -1004,7 +1013,7 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1056,7 +1065,7 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1095,7 +1104,7 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1183,7 +1192,7 @@ if __name__ == '__main__':
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1208,7 +1217,7 @@ if __name__ == '__main__':
         target_position = ( float(randint(0, dims[0]))/100.0, float(randint(0, dims[1]))/100.0 )
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors)
+      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1227,6 +1236,58 @@ if __name__ == '__main__':
       print "> ", move, " <"
       sys.exit(1)
 
+  print "1"
+  pprint(outputSensorData)
+  print "2"
+  pprint(bindLocationTime)
+  print "3"
+  pprint(bindActivityTime)
+  print "4"
+  pprint(activityFacts)
+  print "5"
+  pprint(activityPosNeg)
+
+  return (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg)
+
+if __name__ == '__main__':
+  # Check whether file is given as argument
+  args = sys.argv
+  if len(args) != 5:
+    # Fail
+    print "No files specified."
+    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
+    sys.exit(1)
+
+  # load files
+  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
+
+  # read in house specification
+  roomLayout = rooms( Fadj )
+  generators = activities( Fact )
+  path = path( Fpath )
+  sensors = layout( Flay, roomLayout.keys() )
+
+  persons = path.keys() if type(path) == dict else []
+  # assign locations to sensor for Prolog ground truth
+  itemToLocation(sensors, persons)
+
+  # generate random paths with timestamps
+  ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
+  if type(path) == list:
+    if path[0][0] != 'origin':
+      print "First action is not 'origin'!"
+      sys.exit(1)
+  elif type(path) == dict:
+    for key in path:
+      if path[key][0][0] != 'origin':
+        print "First action of " + key + " is not 'origin'!"
+        sys.exit(1)
+  else:
+    print "Weird error #803, please contact support."
+    sys.exit(1)
+
+  # do path finding
+  (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg) = pathFinder(roomLayout, generators, path, sensors)
 
   # add fifth sparse column to data - it indicates activities start and end
   for (iname, istate, imeasure) in activityPosNeg:
