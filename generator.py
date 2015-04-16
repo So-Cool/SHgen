@@ -307,7 +307,7 @@ def itemToLocation(sensors, persons):
 
 
 # append current activity to ground truth
-def activityToTime(now, origin, sequence, activity, state):
+def activityToTime(now, origin, sequence, activity, state, persona):
   # get UNIX timestamp
   tsn = time.mktime(now.timetuple())
   # append nano seconds and convert to microseconds
@@ -331,10 +331,10 @@ def activityToTime(now, origin, sequence, activity, state):
   t.append(str(get_window(tso, tsn))) # windowed
 
   # prepare to write to file
-  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "relative, " + t[0] + ")." )
-  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "absolute, " + t[1] + ")." )
-  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "sequence, " + t[2] + ")." )
-  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "windowed, " + t[3] + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "relative, " + t[0] + persona + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "absolute, " + t[1] + persona + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "sequence, " + t[2] + persona + ")." )
+  facts.append( currentActivity + "(" + activity + ", " + state + ", " + "windowed, " + t[3] + persona + ")." )
 
   return facts
 
@@ -368,7 +368,7 @@ def get_window( initTime, currentTime ):
 
 
 # generate Prolog ground truth of locations at given time
-def nowInRoom(now, origin, sequence, current):
+def nowInRoom(now, origin, sequence, current, persona):
   # get UNIX timestamp
   tsn = time.mktime(now.timetuple())
   # append nano seconds and convert to microseconds
@@ -392,10 +392,10 @@ def nowInRoom(now, origin, sequence, current):
   t.append(str(get_window(tso, tsn))) # windowed
 
   # prepare to write to file
-  facts.append( spaceTime + "(" + current + ", " + "relative, " + t[0] + ")." )
-  facts.append( spaceTime + "(" + current + ", " + "absolute, " + t[1] + ")." )
-  facts.append( spaceTime + "(" + current + ", " + "sequence, " + t[2] + ")." )
-  facts.append( spaceTime + "(" + current + ", " + "windowed, " + t[3] + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "relative, " + t[0] + persona + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "absolute, " + t[1] + persona + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "sequence, " + t[2] + persona + ")." )
+  facts.append( spaceTime + "(" + current + ", " + "windowed, " + t[3] + persona + ")." )
 
   return facts
 
@@ -796,19 +796,21 @@ def handleDate(s):
 # pathfinder
 def pathFinder(roomLayout, generators, pathpp, sensors):
   def getPerson(sp):
-    return sp[0].lower() + sp[1:]
+    if sp == "":
+      return sp
+    else:
+      return ", " + sp[0].lower() + sp[1:]
 
   occupierID = ""
   mul = False
   if type(pathpp) == dict:
-    occupierID += ", "
     mul = True
     ks = pathpp.keys()
+    occupierID = ks[0]
     path = pathpp.pop(ks[0], None)
   else:
     path = pathpp
 
-  print path
   ## initialise location variables
   current = None
   ## initialise sensor watchdog
@@ -829,6 +831,8 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
   ## memorise activities ground truth: positives and negative
   activityPosNeg = []
   for move in path:
+    persona = getPerson( occupierID )
+
     if   move[0] == 'origin': # location
       current = move[1]
       # get position in start room with cm accuracy
@@ -851,18 +855,16 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += ua
       ###
       # generate Prolog ground truth of locations: DO NOT MOVE
-      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
-
-
+      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
     elif move[0] == 'go': # location
       # move from current to new_location
       ## Find path in adjacency matrix -- BFS
@@ -917,24 +919,24 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
               ## mark beginning of activity block: needed to get true values
               while len(blockIncrements) > 0:
                 trueValue = blockIncrements.pop(0)
-                bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+                bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
                 # memorise activity start & end for PosNeg generation #Aleph
                 gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-                activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+                activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
             ##DONOTMOVE
             outputSensorData += ua
             # initialise new room
 
             # generate Prolog ground truth of locations: DO NOT MOVE
-            bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+            bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
 
             tt = monitor(current, sensors[current]['sensor'])
         else:
           tt = monitor(current, sensors[current]['sensor'])
           
           # generate Prolog ground truth of locations: DO NOT MOVE
-          bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+          bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
 
         # go from location in previous to door to *room*
         ## find location of door
@@ -948,11 +950,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
           ## mark beginning of activity block: needed to get true values
           while len(blockIncrements) > 0:
             trueValue = blockIncrements.pop(0)
-            bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+            bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
             # memorise activity start & end for PosNeg generation #Aleph
             gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-            activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+            activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
         ##DONOTMOVE
         outputSensorData += readings
 
@@ -974,16 +976,16 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += ua
 
       # generate Prolog ground truth of locations: DO NOT MOVE
-      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current)
+      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
 
       # Now you are in new room but haven't moved yet: check sensors
       tt = monitor(current, sensors[current]['sensor'])
@@ -996,11 +998,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += ua
 
@@ -1020,11 +1022,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += readings
 
@@ -1033,16 +1035,16 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## mark beginning of activity block: needed to get true values
       while len(blockIncrements) > 0:
         trueValue = blockIncrements.pop(0)
-        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
         # memorise activity start & end for PosNeg generation #Aleph
         gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
 
 
       # do the activity: emulate sensors
       ## save ground truth: ON
-      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true", persona)
 
       ## activate sensor
       activated = tt.activateItem(sensorID)
@@ -1054,7 +1056,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       now += datetime.timedelta(days, seconds, miliseconds)
 
       ## save ground truth: OFF
-      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false")
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false", persona)
 
       ## turn of activity sensor
       activated = tt.deactivateItem(sensorID)
@@ -1072,11 +1074,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += readings
 
@@ -1085,16 +1087,16 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## mark beginning of activity block: needed to get true values
       while len(blockIncrements) > 0:
         trueValue = blockIncrements.pop(0)
-        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
         # memorise activity start & end for PosNeg generation #Aleph
         gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
 
 
       # do the activity: emulate sensors
       ## save ground truth: ON
-      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true")
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "true", persona)
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
@@ -1111,11 +1113,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += readings
 
@@ -1123,14 +1125,14 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## mark beginning of activity block: needed to get true values
       while len(blockIncrements) > 0:
         trueValue = blockIncrements.pop(0)
-        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+        bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
         # memorise activity start & end for PosNeg generation #Aleph
         gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-        activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+        activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
 
       ## save ground truth: OFF
-      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false")
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData), move[1], "false", persona)
 
       ## turn of activity sensor
       activated = tt.deactivateItem(sensorID)
@@ -1154,15 +1156,15 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       # if no beginning found append it now
       if beg == False:
         print "WARNING: no support for beginning of activity for block!"
-        bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "true")
+        bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "true", persona)
         # memorise activity start & end for PosNeg generation #Aleph
         gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData)-1)
-        activityPosNeg.append( (move[1], 'true', gtt) )
+        activityPosNeg.append( (move[1], 'true', gtt, persona) )
         # clean block beginning memory
         blockIncrements = []
 
       # mark end of activity block
-      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false")
+      bindActivityTime += activityToTime(now, theVeryBegining, len(outputSensorData)-1, move[1], "false", persona)
 
       # memorise facts
       memid = activityIDs + "(" + move[1] + ")."
@@ -1171,7 +1173,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
 
       # memorise activity start & end for PosNeg generation #Aleph
       gtt = generateTimeTuple(now, theVeryBegining, len(outputSensorData)-1)
-      activityPosNeg.append( (move[1], 'false', gtt) )
+      activityPosNeg.append( (move[1], 'false', gtt, persona) )
     elif move[0] == 'wait':
 
       ## mark beginning of activity block: needed to get true values
@@ -1199,11 +1201,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += readings
     elif move[0] == 'wander':
@@ -1224,11 +1226,11 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         ## mark beginning of activity block: needed to get true values
         while len(blockIncrements) > 0:
           trueValue = blockIncrements.pop(0)
-          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1] )
+          bindActivityTime += activityToTime( dt, theVeryBegining, len(outputSensorData), trueValue[0], trueValue[1], persona )
 
           # memorise activity start & end for PosNeg generation #Aleph
           gtt = generateTimeTuple(dt, theVeryBegining, len(outputSensorData))
-          activityPosNeg.append( (trueValue[0], trueValue[1], gtt) )
+          activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += readings
     else:
@@ -1238,14 +1240,6 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
 
   print "1"
   pprint(outputSensorData)
-  print "2"
-  pprint(bindLocationTime)
-  print "3"
-  pprint(bindActivityTime)
-  print "4"
-  pprint(activityFacts)
-  print "5"
-  pprint(activityPosNeg)
 
   return (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg)
 
@@ -1290,10 +1284,15 @@ if __name__ == '__main__':
   (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg) = pathFinder(roomLayout, generators, path, sensors)
 
   # add fifth sparse column to data - it indicates activities start and end
-  for (iname, istate, imeasure) in activityPosNeg:
+  for (iname, istate, imeasure, pID) in activityPosNeg:
     seq = imeasure[2]
     st = 'begin' if istate == 'true' else 'end'
-    addon = ' ' + iname + ' ' + st
+    # depending on one or multiple residents
+    if pID == "":
+      addon = ' ' + iname + ' ' + st
+    else:
+      # remove comma from personID
+      addon = ' ' + pID[2:] + "_" + iname + ' ' + st
     outputSensorData[seq] += addon
 
   # generate positives and negatives - generate only for *sequence*
@@ -1323,11 +1322,11 @@ if __name__ == '__main__':
     end = a[1][2][2]
     # generate for all the events
     for i in range(beginning):
-      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + a[0][3] + ")." )
     for i in range(beginning, end):
-      pos.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+      pos.append( activityRule + "(" + a[0][0] + ", " + str(i) + a[0][3] + ")." )
     for i in range(end, farEnd):
-      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + ")." )
+      neg.append( activityRule + "(" + a[0][0] + ", " + str(i) + a[0][3] + ")." )
     ## generate for one event with range
     # neg.append( activityRule + "(" + a[0][0] + ", " + str(0) + ", " + str(beginning-1) + ")." )
     # pos.append( activityRule + "(" + a[0][0] + ", " + str(beginning) + ", " + str(end-1) + ")." )
