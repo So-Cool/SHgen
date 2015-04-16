@@ -216,9 +216,10 @@ Time is represented in four different ways:
 Introduce:
 
 - [ ] noise & incompleteness (e.g. throw away some readings)
-- [ ] multiple occupiers
+- [ ] multiple occupiers: delay at the beginning of path
 - [ ] obstacles (furniture)
 - [ ] improve 'stepping' <!--each step randomly generated; no distance calculation at the beginning; step until you're there--->
 - [ ] update *output* section of `README.md` file: positives and negatives
 - [ ] update README: *wait* command cannot be the first command in block
+- [ ] update README: describe path for multiple occupiers
 - [ ] write about *fifth sparse column (activity indicator)*
