@@ -217,6 +217,7 @@ Introduce:
 
 - [ ] noise & incompleteness (e.g. throw away some readings)
 - [ ] multiple occupiers: delay at the beginning of path
+- [ ] forbid to use '_' in activity names
 - [ ] obstacles (furniture)
 - [ ] improve 'stepping' <!--each step randomly generated; no distance calculation at the beginning; step until you're there--->
 - [ ] update *output* section of `README.md` file: positives and negatives
