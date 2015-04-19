@@ -2,7 +2,7 @@
 origin(hall) ; make random for many rooms
 
 ; Make a phone call
-make_a_phone_call{
+make-a-phone-call{
   go(living_room)
 
   return(phone_book)
@@ -16,10 +16,10 @@ make_a_phone_call{
   wander(-1, -1)
   return(phone)
   stop(phone)
-}make_a_phone_call
+}make-a-phone-call
 
 ; Wash hands
-wash_hands{
+wash-hands{
   go(kitchen)
 
   return(water_hot)
@@ -31,7 +31,7 @@ wash_hands{
   wait(3, 0)
   stop(water_cold)
   wander(-1, -1)
-}wash_hands
+}wash-hands
 
 ; cook
 cook{

@@ -42,9 +42,9 @@ eat{
 
 go(kitchen)
 
-wash_up{
+wash-up{
   do(water_hot)
-}wash_up
+}wash-up
 
 go(hall)
 
