@@ -220,6 +220,6 @@ Introduce:
 - [ ] obstacles (furniture)
 - [ ] improve 'stepping' <!--each step randomly generated; no distance calculation at the beginning; step until you're there--->
 - [ ] update *output* section of `README.md` file: positives and negatives
-- [ ] update README: *wait* command cannot be the first command in block
+- [ ] update README: *wait* command cannot be the **first** and **last** command in block
 - [ ] update README: describe path for multiple occupiers
 - [ ] write about *fifth sparse column (activity indicator)*
