@@ -662,24 +662,31 @@ def layout( Flay, keys ):
 # generate entries to update sensor readings
 def updateOutput(activated, now):
   readings = []
+  outDet = []
   for unit in activated:
     # compose entry
     ppp = now.strftime( "%Y-%m-%d %H:%M:%S.%f" ) + " " + unit[0] + " " + unit[1]
     # append to outputData vector
     readings.append( ppp )
-  return readings
+
+    # get output details
+    outDet.append( getOutputDetails(unit[0], unit[1], now) )
+  return (readings, outDet)
 
 
 # move within one room
 def moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current):
   # sensors readings
   readings = []
+  readingsDetails = []
   # Check if you're already there
   if current_position == target_position:
     neededSteps = -1
     activated = tt.motionSensorsOn(current_position)
     # append new activities
-    readings += updateOutput(activated, now)
+    (rs, rsd) = updateOutput(activated, now)
+    readings += rs
+    readingsDetails += rsd
   else:
     ## search the path
     xa, xb, ya, yb = current_position[0], target_position[0], current_position[1], target_position[1]
@@ -706,7 +713,9 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
     ### after each step check whether new sensor is activated
     activated = tt.updateMotionSensor(current_position)
     # append new activities
-    readings += updateOutput(activated, now)
+    (rs, rsd) = updateOutput(activated, now)
+    readings += rs
+    readingsDetails += rsd
 
     # find new position
     ## increment step along distance form *current* towards *target*
@@ -783,7 +792,7 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
     days, seconds, miliseconds = 0, stepTime, 0
     now += datetime.timedelta(days, seconds, miliseconds)
 
-  return (readings, current_position, now)
+  return (readings, current_position, now, readingsDetails)
 
 
 # change data into microsecond stamp
@@ -793,23 +802,33 @@ def handleDate(s):
   return datetime.datetime.strptime( d, "%Y-%m-%d %H:%M:%S.%f" )
 
 
+def getOutputDetails(sensor, state, now):
+  tsn = time.mktime(now.timetuple())
+  # append nano seconds and convert to microseconds
+  tsn *= 1000000
+  tsn += now.microsecond
+  tsn = int(tsn)
+  s = True if state == 'true' else False
+  return (sensor, s, tsn)
+
+
 # pathfinder
-def pathFinder(roomLayout, generators, pathpp, sensors):
+def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
   def getPerson(sp):
     if sp == "":
       return sp
     else:
       return ", " + sp[0].lower() + sp[1:]
 
-  occupierID = ""
-  mul = False
   if type(pathpp) == dict:
-    mul = True
-    ks = pathpp.keys()
-    occupierID = ks[0]
-    path = pathpp.pop(ks[0], None)
+    # path = pathpp.pop(dicKey, None)
+    path = pathpp[dicKey]
+    persona = getPerson( dicKey )
+    detailedOutput = []
   else:
     path = pathpp
+    persona = ""
+    detailedOutput = None
 
   ## initialise location variables
   current = None
@@ -831,8 +850,6 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
   ## memorise activities ground truth: positives and negative
   activityPosNeg = []
   for move in path:
-    persona = getPerson( occupierID )
-
     if   move[0] == 'origin': # location
       current = move[1]
       # get position in start room with cm accuracy
@@ -848,7 +865,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       tt = monitor(current, sensors[current]['sensor'])
       activated = tt.updateMotionSensor(current_position)
       # append new activities
-      ua = updateOutput(activated, now)
+      (ua, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
       ##DONOTMOVE
       if len(ua) != 0:
         dt = handleDate(ua[0])
@@ -912,7 +931,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
             # on room exit switch off sensors which havent switched off & are within you range
             activated = tt.motionSensorsOn(previous_position)
             # append new activities
-            ua = updateOutput(activated, now)
+            (ua, uwn) = updateOutput(activated, now)
+            if detailedOutput != None:
+              detailedOutput += uwn
             ##DONOTMOVE
             if len(ua) != 0:
               dt = handleDate(ua[0])
@@ -943,7 +964,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         target_position = sensors[current]['door'][room]
 
         # move within a room
-        (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+        (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+        if detailedOutput != None:
+          detailedOutput += uwnn
         ##DONOTMOVE
         if len(readings) != 0:
           dt = handleDate(readings[0])
@@ -969,7 +992,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       # Check whether old room has been cleaned
       activated = tt.motionSensorsOn(previous_position)
       # append new activities
-      ua = updateOutput(activated, now)
+      (ua, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
       ##DONOTMOVE
       if len(ua) != 0:
         dt = handleDate(ua[0])
@@ -991,7 +1016,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       tt = monitor(current, sensors[current]['sensor'])
       activated = tt.updateMotionSensor(current_position)
       # append new activities
-      ua = updateOutput(activated, now)
+      (ua, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
       ##DONOTMOVE
       if len(ua) != 0:
         dt = handleDate(ua[0])
@@ -1015,7 +1042,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      if detailedOutput != None:
+        detailedOutput += uwnn
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1049,7 +1078,10 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
-      outputSensorData += updateOutput(activated, now)
+      (uaww, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
+      outputSensorData += uaww
       ## emulate activity time
       stepTime = generators[move[1]]()
       days, seconds, miliseconds = 0, stepTime, 0
@@ -1061,13 +1093,18 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## turn of activity sensor
       activated = tt.deactivateItem(sensorID)
       ### append new activities
-      outputSensorData += updateOutput(activated, now)
+      (uaww, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
+      outputSensorData += uaww
     elif move[0] == 'start':
       # find position of sensor in current room
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      if detailedOutput != None:
+        detailedOutput += uwnn
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1100,13 +1137,18 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## activate sensor
       activated = tt.activateItem(sensorID)
       ### append new activities
-      outputSensorData += updateOutput(activated, now)
+      (uaww, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
+      outputSensorData += uaww
     elif move[0] == 'stop':
       # find position of sensor in current room
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      if detailedOutput != None:
+        detailedOutput += uwnn
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1137,7 +1179,10 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       ## turn of activity sensor
       activated = tt.deactivateItem(sensorID)
       ### append new activities
-      outputSensorData += updateOutput(activated, now)
+      (uaww, uwn) = updateOutput(activated, now)
+      if detailedOutput != None:
+        detailedOutput += uwn
+      outputSensorData += uaww
     elif move[0] == '{':
       # get yourself a space and prepare to get true values
       blockIncrements += [ (move[1], "true") ]
@@ -1194,7 +1239,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       (sensorID, target_position) = tt.getItemDetails(move[1])
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      if detailedOutput != None:
+        detailedOutput += uwnn
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1219,7 +1266,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
         target_position = ( float(randint(0, dims[0]))/100.0, float(randint(0, dims[1]))/100.0 )
 
       # move within a room: go to this position: remember to update current_position & previous_position !!!!
-      (readings, current_position, now) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      (readings, current_position, now, uwnn) = moveWithinRoom(tt, current_position, target_position, now, generators, sensors, current)
+      if detailedOutput != None:
+        detailedOutput += uwnn
       ##DONOTMOVE
       if len(readings) != 0:
         dt = handleDate(readings[0])
@@ -1238,51 +1287,10 @@ def pathFinder(roomLayout, generators, pathpp, sensors):
       print "> ", move, " <"
       sys.exit(1)
 
-  print "1"
-  pprint(outputSensorData)
+  return (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput)
 
-  return (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg)
-
-if __name__ == '__main__':
-  # Check whether file is given as argument
-  args = sys.argv
-  if len(args) != 5:
-    # Fail
-    print "No files specified."
-    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
-    sys.exit(1)
-
-  # load files
-  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
-
-  # read in house specification
-  roomLayout = rooms( Fadj )
-  generators = activities( Fact )
-  path = path( Fpath )
-  sensors = layout( Flay, roomLayout.keys() )
-
-  persons = path.keys() if type(path) == dict else []
-  # assign locations to sensor for Prolog ground truth
-  itemToLocation(sensors, persons)
-
-  # generate random paths with timestamps
-  ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
-  if type(path) == list:
-    if path[0][0] != 'origin':
-      print "First action is not 'origin'!"
-      sys.exit(1)
-  elif type(path) == dict:
-    for key in path:
-      if path[key][0][0] != 'origin':
-        print "First action of " + key + " is not 'origin'!"
-        sys.exit(1)
-  else:
-    print "Weird error #803, please contact support."
-    sys.exit(1)
-
-  # do path finding
-  (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg) = pathFinder(roomLayout, generators, path, sensors)
-
+# mark activity beginning and end in the data script
+def markBE(activityPosNeg, outputSensorData):
   # add fifth sparse column to data - it indicates activities start and end
   for (iname, istate, imeasure, pID) in activityPosNeg:
     seq = imeasure[2]
@@ -1295,7 +1303,12 @@ if __name__ == '__main__':
       addon = ' ' + pID[2:] + "_" + iname + ' ' + st
     outputSensorData[seq] += addon
 
-  # generate positives and negatives - generate only for *sequence*
+  return outputSensorData
+
+# generate positives and negatives - generate only for *sequence*
+def posNegGen(activityPosNeg_, outputSensorData_):
+  activityPosNeg   = activityPosNeg_[:]
+  outputSensorData = outputSensorData_[:]
   pos = []
   neg = []
   farEnd = len(outputSensorData)
@@ -1332,22 +1345,181 @@ if __name__ == '__main__':
     # pos.append( activityRule + "(" + a[0][0] + ", " + str(beginning) + ", " + str(end-1) + ")." )
     # neg.append( activityRule + "(" + a[0][0] + ", " + str(end) + ", " + str(farEnd) + ")." )
 
+  return (pos, neg)
+
+if __name__ == '__main__':
+  # Check whether file is given as argument
+  args = sys.argv
+  if len(args) != 5:
+    # Fail
+    print "No files specified."
+    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
+    sys.exit(1)
+
+  # load files
+  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
+
+  # read in house specification
+  roomLayout = rooms( Fadj )
+  generators = activities( Fact )
+  path = path( Fpath )
+  sensors = layout( Flay, roomLayout.keys() )
+
+  persons = path.keys() if type(path) == dict else []
+  # assign locations to sensor for Prolog ground truth
+  itemToLocation(sensors, persons)
+
+  # generate random paths with timestamps
+  ## e.g. "2008-03-28 13:39:01.470516 M01 ON"
+  # do path finding: (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg)
+  outputDic = None
+  if type(path) == list:
+    # check correctness of input
+    if path[0][0] != 'origin':
+      print "First action is not 'origin'!"
+      sys.exit(1)
+
+    # extract sensors
+    (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput) = pathFinder(roomLayout, generators, path, sensors, "")
+    ## update sensor output with activity indicators
+    outputSensorData = markBE(activityPosNeg, outputSensorData)
+    ## generate positives and negatives
+    (pos, neg) = posNegGen(activityPosNeg, outputSensorData)
+
+  elif type(path) == dict:
+    # check correctness of input
+    for key in path:
+      if path[key][0][0] != 'origin':
+        print "First action of " + key + " is not 'origin'!"
+        sys.exit(1)
+
+    # extract sensors
+    outputDic = {}
+    # outputDic => pos | neg X
+    posnegDic = {}
+    pos = None
+    neg = None
+    bindActivityTime = None
+    bindLocationTime = None
+    #
+    activityFacts = []
+
+    for key in path:
+      odi = pathFinder(roomLayout, generators, path, sensors, key)
+      outputDic[key] = odi
+
+    # mash-up the output and overwrite (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput)
+    allTheTimes = []
+    for key in outputDic:
+      ## get time information
+      for tms in outputDic[key][5]:
+        allTheTimes.append( tms[2] )
+
+      ## update sensor output with activity indicators
+      osd = markBE(outputDic[key][4], outputDic[key][0][:])
+      del outputDic[key][0][:]
+      outputDic[key][0].extend(osd)
+
+      # generate positives and negatives
+      posnegDic[key] = posNegGen(outputDic[key][4], outputDic[key][0])
+
+      # combine activity facts
+      activityFacts += list(set(outputDic[key][3]) - set(activityFacts))
+
+      # print key, ": ", len(outputDic[key][0]); pprint( outputDic[key][0] ); print "\n"
+
+    # remove duplicates
+    allTheTimes = list(set(allTheTimes))
+    # and sort
+    allTheTimes.sort()
+    
+
+
+    # merge data
+    ## create sensor supervisor
+    sensorSupervisor = {} # (state, #)
+    ##### memorise only [key] & [index]
+    keyInd = [] # (key, index)
+    ## memorise activity markings lost in merge
+    mergedActivities = []
+    #
+    outputSensorData = []
+    for tms in allTheTimes: # allTiems => outputsensordata
+      # find all sensor activity happening at that moment
+      for key in outputDic:
+        # get IDs of the element
+        for i, (sr, se, te) in enumerate(outputDic[key][5]):
+          if te < tms:
+            continue
+          elif te > tms:
+            break
+
+          # memorise sensors changes
+          ## if change or not_exists: add to list | else pass
+          try:
+            if sensorSupervisor[sr][0] == se: #se - swap T->F or F->T
+              # add another entry
+              sensorSupervisor[sr] = (se, sensorSupervisor[sr][1]+1)
+              #!!!!!!!!!!what if multiple things happen and reading is discarded
+              sptd = outputDic[key][0][i].split()
+              if len(sptd) >= 6:
+                mergedActivities.append( (len(keyInd)-1, sptd[4:]) )
+            else: # != se
+              if sensorSupervisor[sr][1] > 1:
+                # discard reading: more than 1 person in range
+                sensorSupervisor[sr] = (sensorSupervisor[sr][0], sensorSupervisor[sr][1]-1)
+                #!!!!!!!!!!what if multiple things happen and reading is discarded
+                sptd = outputDic[key][0][i].split()
+                if len(sptd) >= 6:
+                  mergedActivities.append( (len(keyInd)-1, sptd[4:]) )
+              elif sensorSupervisor[sr][1] == 1:
+                sensorSupervisor[sr] = (None, sensorSupervisor[sr][1]-1)
+                keyInd.append( (key, i) )
+              elif sensorSupervisor[sr][1] == 0 and sensorSupervisor[sr][0] == None:
+                sensorSupervisor[sr] = (se, 1)
+                keyInd.append( (key, i) )
+              elif sensorSupervisor[sr][1] <= 0:
+                print "Data error: One to many!"
+                sys.exit(1)
+                
+          except KeyError: #not_exists
+            # add
+            sensorSupervisor[sr] = (se, 1)
+            keyInd.append( (key, i) )
+
+    ## introduce readings to outputSensorData
+    for k, i in keyInd:
+      outputSensorData.append( outputDic[k][0][i] )
+    ## fix any outstanding activity beg/end markings
+    for k, l in mergedActivities:
+      outputSensorData[k] += ' ' + ' '.join(l)
+
+    # print "all: ", len(outputSensorData); pprint( outputSensorData ); print "\n"
+
+  else:
+    print "Weird error #803, please contact support."
+    sys.exit(1)
+
   # Write positive and negative examples
-  with open(posFilename, 'wb') as pf:
-    pf.write( '\n'.join(pos) )
-    pf.write('\n')
-  with open(negFilename, 'wb') as nf:
-    nf.write( '\n'.join(neg) )
-    nf.write('\n')
+  if pos != None:
+    with open(posFilename, 'wb') as pf:
+      pf.write( '\n'.join(pos) )
+      pf.write('\n')
+  if neg != None:
+    with open(negFilename, 'wb') as nf:
+      nf.write( '\n'.join(neg) )
+      nf.write('\n')
 
   # write down Prolog rules
   with open(bgFilename, 'ab') as bgf:
     bgf.write('\n')
     bgf.write( '\n'.join(activityFacts) )
-    bgf.write('\n\n')
-    bgf.write( '\n'.join(bindActivityTime) )
-    bgf.write('\n\n')
-    bgf.write( '\n'.join(bindLocationTime) )
+    if bindActivityTime != None:
+      bgf.write('\n\n')
+      bgf.write( '\n'.join(bindActivityTime) )
+    if bindLocationTime != None:
+      bgf.write('\n\n')
+      bgf.write( '\n'.join(bindLocationTime) )
     bgf.write('\n')
 
   # write generated data to file
