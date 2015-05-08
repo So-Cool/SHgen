@@ -224,3 +224,15 @@ Introduce:
 - [ ] update README: *wait* command cannot be the **first** and **last** command in block
 - [ ] update README: describe path for multiple occupiers
 - [ ] write about *fifth sparse column (activity indicator)*
+
+## Issues: ##
+
+- [ ] random generators with seed so that they an be reconstructed
+- [ ] record (X, Y) as ground truth another dataset similar to current `data.txt`
+- [ ] activities not necessary nested - no curly braces - no indentation
+- [ ] try the above out
+- [ ] sensors not fix at given location
+- [ ] real valued sensor
+- [ ] start - stop keyword problem:
+    * use it for blocks
+    * change keyword for sensors to :*on* & *off*
