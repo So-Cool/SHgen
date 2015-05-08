@@ -2,7 +2,7 @@
 origin(room_1)
 sleep{
   wander(-1, -1)
-  wait(6000, 10)
+  wait(10, 1)
   wander(-1, -1)
 }sleep
 <ResidentA<
@@ -11,7 +11,8 @@ sleep{
 origin(room_2)
 useBathroom{
   go(bathroom)
-  wait(300, 10)
+  wait(400, 10)
   go(room_2)
 }useBathroom
+wander(-1, -1)
 <ResidentB<
