@@ -70,7 +70,7 @@ class monitor:
       # check if table-status agrees with current readings
       if sensorStatus and self.affected(sensorLocation, currentPosition): # id ON & is within your range
         self.truthTable['motion'][sensor]['status'] = not(sensorStatus)
-        firedSensors.append( ( sensor, str(self.truthTable['motion'][sensor]['status']).lower()  ) )        
+        firedSensors.append( ( sensor, str(self.truthTable['motion'][sensor]['status']).lower()  ) )
 
     # return list of sensor with changed state
     return firedSensors
@@ -108,7 +108,7 @@ class monitor:
     # self.truthTable['item'][sensorID]['status'] = False
     sensorState = 'false'
     return [(sensorID, sensorState)]
-    
+
 # time window length in microsecond (10^-6): 5 seconds
 WINDOWLENGTH = 5 * 1000000
 
@@ -709,7 +709,7 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
 
   ### do steps
   for i in range(neededSteps):
-    
+
     ### after each step check whether new sensor is activated
     activated = tt.updateMotionSensor(current_position)
     # append new activities
@@ -836,7 +836,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
   tt = None
   ## remember previous position
   previous_position = None
-  ## time increment for block: act{...}act 
+  ## time increment for block: act{...}act
   blockIncrements = []
   # initialise time
   now = theVeryBegining = datetime.datetime.now()
@@ -868,6 +868,9 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
       (ua, uwn) = updateOutput(activated, now)
       if detailedOutput != None:
         detailedOutput += uwn
+      ###
+      # generate Prolog ground truth of locations: DO NOT MOVE
+      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
       ##DONOTMOVE
       if len(ua) != 0:
         dt = handleDate(ua[0])
@@ -881,9 +884,6 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
           activityPosNeg.append( (trueValue[0], trueValue[1], gtt, persona) )
       ##DONOTMOVE
       outputSensorData += ua
-      ###
-      # generate Prolog ground truth of locations: DO NOT MOVE
-      bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
     elif move[0] == 'go': # location
       # move from current to new_location
       ## Find path in adjacency matrix -- BFS
@@ -955,7 +955,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
             tt = monitor(current, sensors[current]['sensor'])
         else:
           tt = monitor(current, sensors[current]['sensor'])
-          
+
           # generate Prolog ground truth of locations: DO NOT MOVE
           bindLocationTime += nowInRoom(now, theVeryBegining, len(outputSensorData), current, persona)
 
@@ -1257,7 +1257,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
       outputSensorData += readings
     elif move[0] == 'wander':
       target_position = move[1]
-      
+
       if target_position[0] == -1 and target_position[1] == -1:
         dims = sensors[current]['dimension']
         ## change from meters to cent-meters
@@ -1320,7 +1320,7 @@ def posNegGen(activityPosNeg_, outputSensorData_):
     for i in range(len(activityPosNeg))[::-1]:
       if activityPosNeg[i][0] == a[0][0]:
         a.append( activityPosNeg.pop(i) )
-    
+
     # for the moment forbid the same activity repeated within one file
     # or the list does not start with *{* and finishes with *}*
     if len(a) != 2 or a[0][1] != 'true' or a[1][1] != 'false':
@@ -1432,7 +1432,7 @@ if __name__ == '__main__':
     allTheTimes = list(set(allTheTimes))
     # and sort
     allTheTimes.sort()
-    
+
 
 
     # merge data
@@ -1481,7 +1481,7 @@ if __name__ == '__main__':
               elif sensorSupervisor[sr][1] <= 0:
                 print "Data error: One to many!"
                 sys.exit(1)
-                
+
           except KeyError: #not_exists
             # add
             sensorSupervisor[sr] = (se, 1)
