@@ -8,6 +8,15 @@ from numpy.random import normal
 from math import sqrt, ceil
 from random import randint
 from pprint import pprint
+import argparse
+
+# parse arguments
+parser = argparse.ArgumentParser(description='Smart house data generator.')
+parser.add_argument('-t', '--time', type=str, nargs=1, required=False, dest="time", default=None, help=('time to use as a starting point in 24h format *Month Day Year hh.mm * e.g. "Jun 1 2005  13.33" (quotation marks are required)'))
+parser.add_argument('adjacency', type=str, nargs=1, help='path to your adjacency matrix')
+parser.add_argument('layout', type=str, nargs=1, help='path to your house layout')
+parser.add_argument('activities', type=str, nargs=1, help='path to your activities definitions')
+parser.add_argument('path', type=str, nargs=1, help='path to your agent script (path)')
 
 # Gaussian generator class
 class genGaus:
@@ -813,7 +822,7 @@ def getOutputDetails(sensor, state, now):
 
 
 # pathfinder
-def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
+def pathFinder(roomLayout, generators, pathpp, sensors, dicKey, startTime):
   def getPerson(sp):
     if sp == "":
       return sp
@@ -839,7 +848,10 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
   ## time increment for block: act{...}act
   blockIncrements = []
   # initialise time
-  now = theVeryBegining = datetime.datetime.now()
+  if type(startTime) != datetime.datetime:
+    now = theVeryBegining = datetime.datetime.now()
+  else:
+    now = theVeryBegining = startTime
   ## get output data stream
   outputSensorData = []
   ## get output data stream for Prolog ground truth
@@ -1223,7 +1235,7 @@ def pathFinder(roomLayout, generators, pathpp, sensors, dicKey):
 
       ## mark beginning of activity block: needed to get true values
       if len(blockIncrements) > 0:
-        print "Command *wait* cannot be the first element of block!"
+        print "Command *wait* cannot be the first element of block!", move[1]
         sys.exit(1)
 
       ## emulate time
@@ -1349,15 +1361,21 @@ def posNegGen(activityPosNeg_, outputSensorData_):
 
 if __name__ == '__main__':
   # Check whether file is given as argument
-  args = sys.argv
-  if len(args) != 5:
-    # Fail
-    print "No files specified."
-    print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
-    sys.exit(1)
+  args = parser.parse_args()
+  Fadj, Flay, Fact, Fpath = args.adjacency[0], args.layout[0], args.activities[0], args.path[0]
+  if args.time != None:
+    inputTime = datetime.datetime.strptime(args.time[0], "%B %d %Y %H.%M")
+  else:
+    inputTime = args.time
 
-  # load files
-  Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
+  # args = sys.argv
+  # if len(args) != 5:
+    # # Fail
+    # print "No files specified."
+    # print "usage: constructFacts.py path/to/adjacency path/to/activities path/to/path path/to/layout"
+    # sys.exit(1)
+  # # load files
+  # Fadj, Flay, Fact, Fpath  = args[1], args[2], args[3], args[4]
 
   # read in house specification
   roomLayout = rooms( Fadj )
@@ -1380,7 +1398,7 @@ if __name__ == '__main__':
       sys.exit(1)
 
     # extract sensors
-    (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput) = pathFinder(roomLayout, generators, path, sensors, "")
+    (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput) = pathFinder(roomLayout, generators, path, sensors, "", inputTime)
     ## update sensor output with activity indicators
     outputSensorData = markBE(activityPosNeg, outputSensorData)
     ## generate positives and negatives
@@ -1405,7 +1423,7 @@ if __name__ == '__main__':
     activityFacts = []
 
     for key in path:
-      odi = pathFinder(roomLayout, generators, path, sensors, key)
+      odi = pathFinder(roomLayout, generators, path, sensors, key, inputTime)
       outputDic[key] = odi
 
     # mash-up the output and overwrite (outputSensorData, bindLocationTime, bindActivityTime, activityFacts, activityPosNeg, detailedOutput)

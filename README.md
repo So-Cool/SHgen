@@ -20,11 +20,20 @@ The application assumes:
 Due to `Prolog` data generation all sensors and activities **must** start with *lower case letter*.
 
 ## Usage ##
+For usage information run:
+``` Bash
+python ./generator.py -h
+```
 To run the script on *example* input files call:
 ```Bash
     python ./generator.py examples/rooms.l examples/layout.l examples/activities.l examples/path.l
 ```
 with each file as described below.
+
+Additionally, starting time of the script can be specified with parameter `-t`, e.g.:
+``` Bash
+python ./generator.py -t "January 1 2015 07.15" examples/rooms.l examples/layout.l examples/activities.l examples/path.l
+```
 
 ## Input ##
 The script takes 4 specification files in presented order:
