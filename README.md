@@ -35,6 +35,8 @@ Additionally, starting time of the script can be specified with parameter `-t`, 
 python ./generator.py -t "January 1 2015 07.15" examples/rooms.l examples/layout.l examples/activities.l examples/path.l
 ```
 
+To generate `Aleph` positive and negative examples add option `-f`.
+
 ## Input ##
 The script takes 4 specification files in presented order:
 

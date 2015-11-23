@@ -13,6 +13,7 @@ import argparse
 # parse arguments
 parser = argparse.ArgumentParser(description='Smart house data generator.')
 parser.add_argument('-t', '--time', type=str, nargs=1, required=False, dest="time", default=None, help=('time to use as a starting point in 24h format *Month Day Year hh.mm * e.g. "Jun 1 2005  13.33" (quotation marks are required)'))
+parser.add_argument('-f', '--facts', required=False, dest="facts", default=False, action='store_true', help=('generate Aleph positive and negative examples'))
 parser.add_argument('adjacency', type=str, nargs=1, help='path to your adjacency matrix')
 parser.add_argument('layout', type=str, nargs=1, help='path to your house layout')
 parser.add_argument('activities', type=str, nargs=1, help='path to your activities definitions')
@@ -1519,14 +1520,15 @@ if __name__ == '__main__':
     sys.exit(1)
 
   # Write positive and negative examples
-  if pos != None:
-    with open(posFilename, 'wb') as pf:
-      pf.write( '\n'.join(pos) )
-      pf.write('\n')
-  if neg != None:
-    with open(negFilename, 'wb') as nf:
-      nf.write( '\n'.join(neg) )
-      nf.write('\n')
+  if args.facts:
+    if pos != None:
+      with open(posFilename, 'wb') as pf:
+        pf.write( '\n'.join(pos) )
+        pf.write('\n')
+    if neg != None:
+      with open(negFilename, 'wb') as nf:
+        nf.write( '\n'.join(neg) )
+        nf.write('\n')
 
   # write down Prolog rules
   with open(bgFilename, 'ab') as bgf:
