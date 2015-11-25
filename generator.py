@@ -802,6 +802,18 @@ def moveWithinRoom(tt, current_position, target_position, now, generators, senso
     days, seconds, miliseconds = 0, stepTime, 0
     now += datetime.timedelta(days, seconds, miliseconds)
 
+  # Update sensors after location trimming
+  ### after each step check whether new sensor is activated
+  activated = tt.updateMotionSensor(current_position)
+  # append new activities
+  (rs, rsd) = updateOutput(activated, now)
+  readings += rs
+  readingsDetails += rsd
+  # update time
+  stepTime = generators['stepTime']()
+  days, seconds, miliseconds = 0, stepTime, 0
+  now += datetime.timedelta(days, seconds, miliseconds)
+
   return (readings, current_position, now, readingsDetails)
 
 
