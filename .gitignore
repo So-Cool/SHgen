@@ -9,3 +9,6 @@
 
 # User defined input
 *.ui
+
+# House designs
+houses/*
