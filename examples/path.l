@@ -11,7 +11,7 @@ cook{
     do(medicine_container)
     do(pot)
   stop(cabinet)
-  do(water_cold)
+  do(water_cold_sink)
   start(burner)
 
   watchTV{
@@ -23,27 +23,25 @@ cook{
   stop(burner)
 }cook
 
-go(living_room)
-
 eat{
   start(table)
   wait(300, 50)
   stop(table)
   phone_call{
+    go(living_room)
     do(phone)
     wander(5, 5)
     wander(1, 5)
     wander(5, 1)
+    go(kitchen)
   }phone_call
   start(table)
   wait(1020, 75)
   stop(table)
 }eat
 
-go(kitchen)
-
 wash-up{
-  do(water_hot)
+  do(water_hot_sink)
 }wash-up
 
 go(hall)
