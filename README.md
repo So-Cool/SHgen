@@ -2,7 +2,7 @@
 
 This software is distributed under **GNU General Public License v3.0** (see `LICENSE.md` for details).
 
-You can cite this code and data with *DOI holder*.
+You can cite this code and data with [![DOI](https://zenodo.org/badge/19490/So-Cool/SHgen.svg)](https://zenodo.org/badge/latestdoi/19490/So-Cool/SHgen).
 
 This small `Python` script: `generator.py`, simulates smart house data feed based on basic house specification. It takes: *room layout*, *sensor layout*, *sensor specification* and *path* to simulate as input; and outputs *data* in [CASAS](http://ailab.wsu.edu/casas/datasets.html) format together with *ground truth* as `Prolog` facts (see *Input* & *Output* sections for details).
 
