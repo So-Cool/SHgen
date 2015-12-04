@@ -25,4 +25,27 @@ Three different data packages are prepared based on the above path scripts. They
 
 Additionally the data is represented in an `Aleph` readable format.
 
+## Dataset structure ##
+```
+Dataset
+├── AlephData
+│   ├── data.b
+│   ├── data.f
+│   ├── data.n
+│   ├── data.not.f
+│   ├── data.not.lr.f
+│   ├── data.not.lr.n
+│   ├── data.not.n
+│   ├── data.return.f
+│   ├── data.return.lr.f
+│   ├── data.return.lr.n
+│   └── data.return.n
+├── bg.pl
+├── data.pl
+└── data.txt
+```
+
+## Fused dataset ##
+Additionally to the three above datasets one package with combined data is available: `21day_fusion_f2br`.
+
 All the datasets are available as a GitHub Release [here](https://github.com/So-Cool/SHgen/releases).
